@@ -1,4 +1,4 @@
 flvc
 ====
 
-FLVC-specific Islandora Hooks
+FLVC-specific Islandora Hooks.
