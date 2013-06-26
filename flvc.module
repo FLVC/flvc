@@ -1,0 +1,115 @@
+<?php
+
+// $Id$
+
+/**
+ * @file
+ * Collected FLVC hooks (maybe),  IID only now
+ *
+ */
+
+
+function flvc_form_alter(&$form, $form_state, $form_id) {
+
+  if ($form_id == 'islandora_ingest_form')
+  {
+    if ($form['form_step_id']['#value'] == 'xml_form_builder_metadata_step')
+    {
+      $form['#validate'][] = 'iid_validate_ingest';
+    }
+  }
+
+  if ($form_id == 'xml_form_builder_edit_datastream_form')
+  {
+      if (!isset($form['available_forms']))
+      {
+          $form['#validate'][] = 'iid_validate_edit';
+      }
+  }
+}
+
+function iid_validate_ingest($form, &$form_state) {
+
+  $errmsg = 'The following IID identifiers already exist: ';
+  $error_IID_numbers = '';
+  $identifier_count = 0;
+  if (isset($form['id'])) {
+      $identifier_count = count($form['id']);
+  }
+
+  $iid_count = 0;
+  for ($i=0; $i<$identifier_count; $i++)
+  {
+    if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp($form['id'][$i]['type']['#value'], 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
+    {
+      $iid_count += 1;
+      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . trim(strtolower($form['id'][$i]['identifier']['#value']));
+
+      $results = file_get_contents($solr_url);
+      $solr_results = array();
+      if (isset($results)) {
+          $solr_results = json_decode($results, TRUE);
+          $numfound = $solr_results['response']['numFound'];
+          if ($numfound > 0) {
+              //form_set_error('', t('The IID identifier %iidnum already exists.', array('%iidnum' => $form['id'][$i]['identifier']['#value'])));
+              $error_IID_numbers = $error_IID_numbers . $form['id'][$i]['identifier']['#value'] . ' ';
+          }
+      }
+    }
+  }
+
+  if ($iid_count == 0) {
+    form_set_error('', t('You must enter an IID identifier.'));
+  }
+
+  if (strlen($error_IID_numbers) > 0) {
+    form_set_error('', t('The following IID identifiers already exist: %iidnums', array('%iidnums' => $error_IID_numbers)));
+  }
+}
+
+function iid_validate_edit($form, &$form_state) {
+
+  $error_IID_numbers = '';
+
+  $identifier_count = 0;
+  if (isset($form['id'])) {
+      $identifier_count = count($form['id']);
+  }
+
+  $form_action = explode('/',$form['#action']);
+  $edit_object_pid = urldecode($form_action[3]);
+
+  $iid_count = 0;
+  for ($i=0; $i<$identifier_count; $i++)
+  {
+    if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp($form['id'][$i]['type']['#value'], 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
+    {
+      $iid_count += 1;
+      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . trim(strtolower($form['id'][$i]['identifier']['#value']));
+
+      $results = file_get_contents($solr_url);
+      $solr_results = array();
+      if (isset($results)) {
+          $solr_results = json_decode($results, TRUE);
+          $numfound = $solr_results['response']['numFound'];
+          if ($numfound > 0) {
+              $object_results = $solr_results['response']['docs'];
+              foreach ($object_results as $object_index => $object_result)
+              {
+                  if ($edit_object_pid != $object_result['PID']) {
+                      $error_IID_numbers = $error_IID_numbers . $form['id'][$i]['identifier']['#value'] . ' ';
+                  }
+              }
+          }
+      }
+    }
+  }
+
+  if ($iid_count == 0) {
+    form_set_error('', t('You must enter an IID identifier.'));
+  }
+
+  if (strlen($error_IID_numbers) > 0) {
+    form_set_error('', t('The following IID identifiers already exist in other objects: %iidnums', array('%iidnums' => $error_IID_numbers)));
+  }
+}

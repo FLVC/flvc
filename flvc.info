@@ -1,0 +1,8 @@
+; $Id$
+name = FLVC
+description = "Module for adding FLVC-specific hooks: right now, IID checks"
+package = FLVC Islandora
+core = 7.x
+files[] = flvc.module
+files[] = flvc.install
+php = 5.2

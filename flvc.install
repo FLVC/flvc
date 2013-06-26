@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * implements hook_install
+ */
+
+function flvc_install() {
+
+   watchdog("FLVC Module", "Installing module (place-holder");
+
+}
+
+
+/**
+ * implements hook_uninstall
+ */
+function flvc_uninstall() {
+
+   watchdog("FLVC Module", "Uninstalling module (place-holder");
+
+}
