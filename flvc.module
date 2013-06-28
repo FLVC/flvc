@@ -43,7 +43,7 @@ function iid_validate_ingest($form, &$form_state) {
     if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp($form['id'][$i]['type']['#value'], 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
     {
       $iid_count += 1;
-      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . trim(strtolower($form['id'][$i]['identifier']['#value']));
+      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . urlencode(escapeSolrValue(trim(strtolower($form['id'][$i]['identifier']['#value']))));
 
       $results = file_get_contents($solr_url);
       $solr_results = array();
@@ -85,7 +85,7 @@ function iid_validate_edit($form, &$form_state) {
     if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp($form['id'][$i]['type']['#value'], 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
     {
       $iid_count += 1;
-      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . trim(strtolower($form['id'][$i]['identifier']['#value']));
+      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_ms%3A" . urlencode(escapeSolrValue(trim(strtolower($form['id'][$i]['identifier']['#value']))));
 
       $results = file_get_contents($solr_url);
       $solr_results = array();
@@ -112,4 +112,13 @@ function iid_validate_edit($form, &$form_state) {
   if (strlen($error_IID_numbers) > 0) {
     form_set_error('', t('The following IID identifiers already exist in other objects: %iidnums', array('%iidnums' => $error_IID_numbers)));
   }
+}
+
+function escapeSolrValue($string)
+{
+    $match = array('\\', '+', '-', '&', '|', '!', '(', ')', '{', '}', '[', ']', '^', '~', '*', '?', ':', '"', ';', ' ');
+    $replace = array('\\\\', '\\+', '\\-', '\\&', '\\|', '\\!', '\\(', '\\)', '\\{', '\\}', '\\[', '\\]', '\\^', '\\~', '\\*', '\\?', '\\:', '\\"', '\\;', '\\ ');
+    $string = str_replace($match, $replace, $string);
+     
+    return $string;
 }
