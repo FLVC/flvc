@@ -65,6 +65,43 @@ function iid_validate_ingest($form, &$form_state) {
   if (strlen($error_IID_numbers) > 0) {
     form_set_error('', t('The following IID identifiers already exist: %iidnums', array('%iidnums' => $error_IID_numbers)));
   }
+
+  // check format of purls
+  $server_error_purls = '';
+  $error_purls = '';
+
+  if (isset($form['location'])) {
+      $location_count = count($form['location']);
+  }
+
+  $purl_count = 0;
+  for ($i=0; $i<$location_count; $i++)
+  {
+    if ( (isset($form['location'][$i]['locDispLabel']['#value']))&&(isset($form['location'][$i]['URL']['#value']))&&(strcasecmp($form['location'][$i]['locDispLabel']['#value'], 'PURL') == 0)&&(strlen(trim($form['location'][$i]['URL']['#value'])) > 0) )
+    {
+      $purl_count += 1;
+      $url = trim($form['location'][$i]['URL']['#value']);
+      if ((strpos($url,'http://purl.flvc.org') === false)&&(strpos($url,'http://purl.fcla.edu') === false)) {
+          $server_error_purls = $server_error_purls . $url . ' ';
+      }
+      else {
+          $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
+          $hoststr = '/' . $form['extension']['flvc']['owningInst']['#value'] . '/';
+          if (stripos($purl_id,$hoststr) !== 0) {
+              $error_purls = $error_purls . $url . ' ';
+          }
+      }
+    }
+  }
+
+  if (strlen($server_error_purls) > 0) {
+    form_set_error('', t('The following PURLs have incorrect server names: %badpurls.  Allowable server names are http://purl.flvc.org or http://purl.fcla.edu only.', array('%badpurls' => $server_error_purls)));
+  }
+
+  if (strlen($error_purls) > 0) {
+    form_set_error('', t('Allowable PURL domains are %domains.  The following PURLs have incorrect formats: %badpurls', array('%domains' => $form['extension']['flvc']['owningInst']['#value'], '%badpurls' => $error_purls)));
+  }
+
 }
 
 function iid_validate_edit($form, &$form_state) {
@@ -112,6 +149,47 @@ function iid_validate_edit($form, &$form_state) {
   if (strlen($error_IID_numbers) > 0) {
     form_set_error('', t('The following IID identifiers already exist in other objects: %iidnums', array('%iidnums' => $error_IID_numbers)));
   }
+
+  // check format of purls
+  $server_error_purls = '';
+  $error_purls = '';
+
+  if (isset($form['location'])) {
+      $location_count = count($form['location']);
+  }
+
+  $purl_count = 0;
+  for ($i=0; $i<$location_count; $i++)
+  {
+    if ( (isset($form['location'][$i]['locDispLabel']['#value']))&&(isset($form['location'][$i]['URL']['#value']))&&(strcasecmp($form['location'][$i]['locDispLabel']['#value'], 'PURL') == 0)&&(strlen(trim($form['location'][$i]['URL']['#value'])) > 0) )
+    {
+      $purl_count += 1;
+      $url = trim($form['location'][$i]['URL']['#value']);
+      if ((strpos($url,'http://purl.flvc.org') === false)&&(strpos($url,'http://purl.fcla.edu') === false)) {
+          $server_error_purls = $server_error_purls . $url . ' ';
+      }
+      else {
+          $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
+          $hoststr = '/' . $form['extension']['flvc']['owningInst']['#value'] . '/';
+          if ((stripos($purl_id,$hoststr) !== 0)&&(stripos($purl_id,'/flvc/') !== 0)&&(stripos($purl_id,'/fcla/') !== 0)) {
+              $error_purls = $error_purls . $url . ' ';
+          }
+      }
+    }
+  }
+
+  if (strlen($server_error_purls) > 0) {
+    form_set_error('', t('The following PURLs have incorrect server names: %badpurls.  Allowable server names are http://purl.flvc.org or http://purl.fcla.edu only.', array('%badpurls' => $server_error_purls)));
+  }
+
+  $domains = $form['extension']['flvc']['owningInst']['#value'];
+  if (strcasecmp($domains, 'flvc') != 0) $domains = $domains . ' FLVC';
+  $domains = $domains . ' FCLA';
+
+  if (strlen($error_purls) > 0) {
+    form_set_error('', t('Allowable PURL domains are %domains.  The following PURLs have incorrect formats: %badpurls', array('%domains' => $domains, '%badpurls' => $error_purls)));
+  }
+
 }
 
 function escapeSolrValue($string)
@@ -121,4 +199,119 @@ function escapeSolrValue($string)
     $string = str_replace($match, $replace, $string);
      
     return $string;
+}
+
+function flvc_islandora_object_ingested(AbstractObject $object) {
+
+    if (!isset($object['MODS']))
+        return;
+
+    $owning_institution = '';
+    $purl = '';
+    $purl_id = '';
+
+    $mods_str = $object['MODS']->content;
+    $mods_xml = new SimpleXMLElement($mods_str);
+
+    // check for owning institution
+    $found_owning_inst = FALSE;
+    $namespaces = $mods_xml->getNameSpaces(true);
+    if ((isset($mods_xml->extension))&&(isset($namespaces['flvc']))) {
+        $flvc_entry = $mods_xml->extension->children($namespaces['flvc']);
+        if ((count($flvc_entry) == 1)&&(isset($flvc_entry->flvc))) {
+            $flvc_fields = $flvc_entry->flvc->children($namespaces['flvc']);
+            if (isset($flvc_fields->owningInstitution)&&(strlen($flvc_fields->owningInstitution) > 0)) {
+                $found_owning_inst = TRUE;
+                $owning_institution = strtolower($flvc_fields->owningInstitution);
+            }
+        }
+    }
+    if ($found_owning_inst == FALSE)
+        return;
+
+    // check for IID identifier
+    $iid_count = 0;
+    if (isset($mods_xml->identifier)) {
+            foreach ($mods_xml->identifier as $identifier) {
+              if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
+                $iid_count += 1;
+              }
+            }
+    }
+    if ($iid_count == 0)
+        return;
+
+    // check for PURL
+    foreach ($mods_xml->location as $location) {
+        $url = $location->url;
+        if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
+            $purl = str_replace('http://purl.fcla.edu','',$url);
+            $purl_id = str_replace('http://purl.flvc.org','',$purl);
+
+            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective.rb --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+            drupal_set_message(t($command));
+            exec($command);
+        }
+    }
+
+    unset($mods_xml);
+}
+
+function flvc_islandora_datastream_modified(AbstractObject $object, AbstractDatastream $datastream) {
+
+    if ($datastream->id != 'MODS')
+        return;
+
+    if (!isset($object['MODS']))
+        return;
+
+    $owning_institution = '';
+    $purl = '';
+    $purl_id = '';
+
+    $mods_str = $object['MODS']->content;
+    $mods_xml = new SimpleXMLElement($mods_str);
+
+    // check for owning institution
+    $found_owning_inst = FALSE;
+    $namespaces = $mods_xml->getNameSpaces(true);
+    if ((isset($mods_xml->extension))&&(isset($namespaces['flvc']))) {
+        $flvc_entry = $mods_xml->extension->children($namespaces['flvc']);
+        if ((count($flvc_entry) == 1)&&(isset($flvc_entry->flvc))) {
+            $flvc_fields = $flvc_entry->flvc->children($namespaces['flvc']);
+            if (isset($flvc_fields->owningInstitution)&&(strlen($flvc_fields->owningInstitution) > 0)) {
+                $found_owning_inst = TRUE;
+                $owning_institution = strtolower($flvc_fields->owningInstitution);
+            }
+        }
+    }
+    if ($found_owning_inst == FALSE)
+        return;
+
+    // check for IID identifier
+    $iid_count = 0;
+    if (isset($mods_xml->identifier)) {
+            foreach ($mods_xml->identifier as $identifier) {
+              if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
+                $iid_count += 1;
+              }
+            }
+    }
+    if ($iid_count == 0)
+        return;
+
+    // check for PURL
+    foreach ($mods_xml->location as $location) {
+        $url = $location->url;
+        if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
+            $purl = str_replace('http://purl.fcla.edu','',$url);
+            $purl_id = str_replace('http://purl.flvc.org','',$purl);
+
+            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective.rb --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+            drupal_set_message(t($command));
+            exec($command);
+        }
+    }
+
+    unset($mods_xml);
 }
