@@ -247,10 +247,16 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
         if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
             $purl_id = str_replace('http://purl.flvc.org','',$purl);
-
-            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective.rb --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
-            drupal_set_message(t($command));
-            exec($command);
+            if (($owning_institution == 'fsu')||($owning_institution == 'flvc')) {
+                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+                //drupal_set_message(t($command));
+                $execout = array();
+                exec($command, $execout);
+                foreach ($execout as $msg) {
+                    if (strpos($msg,'PURLERROR') !== false)
+                        drupal_set_message($msg);
+                }
+            }
         }
     }
 
@@ -306,10 +312,16 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
         if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
             $purl_id = str_replace('http://purl.flvc.org','',$purl);
-
-            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective.rb --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
-            drupal_set_message(t($command));
-            exec($command);
+            if (($owning_institution == 'fsu')||($owning_institution == 'flvc')) {
+                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+                //drupal_set_message(t($command));
+                $execout = array();
+                exec($command, $execout);
+                foreach ($execout as $msg) {
+                    if (strpos($msg,'PURLERROR') !== false)
+                        drupal_set_message($msg);
+                }
+            }
         }
     }
 
