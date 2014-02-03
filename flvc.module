@@ -70,6 +70,7 @@ function iid_validate_ingest($form, &$form_state) {
   $server_error_purls = '';
   $error_purls = '';
 
+  $location_count = 0;
   if (isset($form['location'])) {
       $location_count = count($form['location']);
   }
@@ -154,6 +155,7 @@ function iid_validate_edit($form, &$form_state) {
   $server_error_purls = '';
   $error_purls = '';
 
+  $location_count = 0;
   if (isset($form['location'])) {
       $location_count = count($form['location']);
   }
@@ -248,7 +250,7 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
             $purl_id = str_replace('http://purl.flvc.org','',$purl);
             if ($owning_institution == 'fsu') {
-                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
                 //drupal_set_message(t($command));
                 $execout = array();
                 exec($command, $execout);
@@ -313,7 +315,7 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
             $purl = str_replace('http://purl.fcla.edu','',$url);
             $purl_id = str_replace('http://purl.flvc.org','',$purl);
             if ($owning_institution == 'fsu') {
-                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . $purl_id . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+                $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
                 //drupal_set_message(t($command));
                 $execout = array();
                 exec($command, $execout);
