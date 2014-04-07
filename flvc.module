@@ -329,3 +329,103 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
 
     unset($mods_xml);
 }
+
+function flvc_page_alter(&$page) {
+
+  $query_root = variable_get('islandora_repository_pid', 'islandora:root');
+  $fedora_object = islandora_object_load($query_root);
+
+  $collection_selected = isset($_GET['collection']) ? $_GET['collection'] : '';
+  if (!empty($collection_selected)) {
+      $query_pid = $collection_selected;
+  }
+  else if (strpos($_SERVER['REQUEST_URI'],'islandora/object/')) {
+      $endpos = strpos($_SERVER['REQUEST_URI'], '/', 18);
+      if ($endpos === false) {
+          $endpos = strpos($_SERVER['REQUEST_URI'], '?', 18);
+      }
+      if ($endpos) {
+          $view_pid = urldecode(substr($_SERVER['REQUEST_URI'],18,$endpos-18));
+      }
+      else {
+          $view_pid = urldecode(substr($_SERVER['REQUEST_URI'],18));
+      }
+      if ($view_pid == $query_root) {
+          $query_pid = $query_root;
+      }
+      else {
+          $query_pid = $view_pid;
+          // query for current object label and hasModel
+          $contentquery = 'select $title $content from <#ri>
+                    where <info:fedora/' . $query_pid . '> <fedora-model:label> $title
+                    and <info:fedora/' . $query_pid . '> <fedora-model:hasModel> $content
+                    minus $content <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>';
+          $results = $fedora_object->repository->ri->itqlQuery($contentquery, 'unlimited');
+          $object_content_type = '';
+          $object_title = '';
+          if (count($results) > 0) {
+              $object_title = $results[0]['title']['value'];
+              $object_content_type = $results[0]['content']['value'];
+          }
+
+          if (strpos($object_content_type, 'collectionCModel'))
+          {
+            $collection_selected = $query_pid;
+          }
+          else
+          {
+            // at a non-collection object
+
+            // special processing if at a newspaper issue, newspaper page, or book page object
+            if ((strpos($object_content_type, 'pageCModel'))||
+                (strpos($object_content_type, 'newspaperIssueCModel'))||
+                (strpos($object_content_type, 'newspaperPageCModel')))
+            {
+                $query_book = 'select $parentObject $collection from <#ri>
+                        where (
+                        $parentObject <fedora-rels-ext:isMemberOfCollection> $collection and
+                        walk(<info:fedora/' . $query_pid . '> <fedora-rels-ext:isMemberOf> $parentObject and $subject <fedora-rels-ext:isMemberOf> $parentObject)
+                      )';
+                $results = $fedora_object->repository->ri->itqlQuery($query_book, 'unlimited');
+                if (count($results) > 0) {
+                    $query_pid = $results[0]['parentObject']['value'];
+                }
+            }
+
+            // get the immediate parent collections
+            $query_string = 'select $parentObject $title $content from <#ri>
+                        where (
+                        $parentObject <fedora-model:label> $title
+                        and $parentObject <fedora-model:hasModel> $content
+                        and (
+                          <info:fedora/' . $query_pid . '> <fedora-rels-ext:isMemberOfCollection> $parentObject
+                        )
+                        and $parentObject <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
+                      )
+                      minus $content <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>
+                      minus $parentObject <mulgara:is> <info:fedora/' . $query_pid . '>
+                      order by $title desc';
+            $results = $fedora_object->repository->ri->itqlQuery($query_string, 'unlimited');
+            //foreach ($results as $result) {
+                // only add parent collection if namespace matches site root
+                //$root_namespace = islandora_get_namespace($query_root);
+                //if (($root_namespace == 'islandora')||(islandora_get_namespace($result['parentObject']['value']) == $root_namespace)) {
+                //    $collection_options = array_merge($collection_options, array($result['parentObject']['value'] => $result['title']['value']));
+                //}
+            //}
+            if (count($results) > 0) {
+                $query_pid = $results[0]['parentObject']['value'];
+            }
+          }
+      }
+  }
+  else {
+      $query_pid = $query_root;
+  }
+
+
+    $script = "window.currentCollection = '" . $query_pid . "';";
+
+    drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
+    
+}
