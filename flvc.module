@@ -424,7 +424,7 @@ function flvc_page_alter(&$page) {
   }
 
 
-    $script = "window.currentCollection = '" . $query_pid . "';";
+    $script = 'window.currentCollection = "' . $query_pid . '";';
 
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
     
