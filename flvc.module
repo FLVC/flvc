@@ -406,16 +406,18 @@ function flvc_page_alter(&$page) {
                       minus $parentObject <mulgara:is> <info:fedora/' . $query_pid . '>
                       order by $title desc';
             $results = $fedora_object->repository->ri->itqlQuery($query_string, 'unlimited');
-            //foreach ($results as $result) {
+            $query_pid = '';
+            foreach ($results as $result) {
                 // only add parent collection if namespace matches site root
-                //$root_namespace = islandora_get_namespace($query_root);
-                //if (($root_namespace == 'islandora')||(islandora_get_namespace($result['parentObject']['value']) == $root_namespace)) {
-                //    $collection_options = array_merge($collection_options, array($result['parentObject']['value'] => $result['title']['value']));
-                //}
-            //}
-            if (count($results) > 0) {
-                $query_pid = $results[0]['parentObject']['value'];
+                $root_namespace = islandora_get_namespace($query_root);
+                if (($root_namespace == 'islandora')||(islandora_get_namespace($result['parentObject']['value']) == $root_namespace)) {
+                    if (strlen($query_pid) > 0) $query_pid .= ';';
+                    $query_pid .= $result['parentObject']['value'];
+                }
             }
+            //if (count($results) > 0) {
+            //    $query_pid = $results[0]['parentObject']['value'];
+            //}
           }
       }
   }
@@ -424,8 +426,7 @@ function flvc_page_alter(&$page) {
   }
 
 
-    $script = 'var _customvars = _customvars || [];_customvars.push(["currentCollection", "' . $query_pid  . '"]);';
-    $script .= 'var _gaq = _gaq || [];_gaq.push(["_setCustomVar", 1, "Collection", "' . $query_pid  . '"]);';
+    $script = 'var _currentCollection = "' . $query_pid  . '";';
 
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
  
