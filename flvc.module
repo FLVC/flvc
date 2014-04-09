@@ -424,8 +424,9 @@ function flvc_page_alter(&$page) {
   }
 
 
-    $script = 'window.currentCollection = "' . $query_pid . '";';
+    $script = 'var _customvars = _customvars || [];_customvars.push(["currentCollection", "' . $query_pid  . '"]);';
+    $script .= 'var _gaq = _gaq || [];_gaq.push(["_setCustomVar", 1, "Collection", "' . $query_pid  . '"]);';
 
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
-    
+ 
 }
