@@ -332,12 +332,14 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
 
 function flvc_page_alter(&$page) {
 
+  $content_model = "islandora:collectionCModel";
   $query_root = variable_get('islandora_repository_pid', 'islandora:root');
   $fedora_object = islandora_object_load($query_root);
 
   $collection_selected = isset($_GET['collection']) ? $_GET['collection'] : '';
   if (!empty($collection_selected)) {
       $query_pid = $collection_selected;
+      $content_model = "islandora:collectionCModel";
   }
   else if (strpos($_SERVER['REQUEST_URI'],'islandora/object/')) {
       $endpos = strpos($_SERVER['REQUEST_URI'], '/', 18);
@@ -352,6 +354,7 @@ function flvc_page_alter(&$page) {
       }
       if ($view_pid == $query_root) {
           $query_pid = $query_root;
+          $content_model = "islandora:collectionCModel";
       }
       else {
           $query_pid = $view_pid;
@@ -366,6 +369,7 @@ function flvc_page_alter(&$page) {
           if (count($results) > 0) {
               $object_title = $results[0]['title']['value'];
               $object_content_type = $results[0]['content']['value'];
+              $content_model = $results[0]['content']['value'];
           }
 
           if (strpos($object_content_type, 'collectionCModel'))
@@ -427,6 +431,9 @@ function flvc_page_alter(&$page) {
 
 
     $script = 'var _currentCollection = "' . $query_pid  . '";';
+    if (strlen($content_model) > 0) {
+        $script .= 'var _currentContentModel = "' . $content_model . '";';
+    }
 
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
  
