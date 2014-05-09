@@ -332,7 +332,8 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
 
 function flvc_page_alter(&$page) {
 
-  $content_model = "islandora:collectionCModel";
+  //$content_model = "islandora:collectionCModel";
+  $content_model = '';
   $query_root = variable_get('islandora_repository_pid', 'islandora:root');
   $fedora_object = islandora_object_load($query_root);
 
@@ -433,6 +434,59 @@ function flvc_page_alter(&$page) {
     $script = 'var _currentCollection = "' . $query_pid  . '";';
     if (strlen($content_model) > 0) {
         $script .= 'var _currentContentModel = "' . $content_model . '";';
+    }
+
+    $search_url = '';
+    $solr_query = '*';
+    if (strpos($_SERVER['REQUEST_URI'],'islandora/search/')) {
+      $search_url = '/islandora/search/';
+      $endpos = strpos($_SERVER['REQUEST_URI'], '?', 18);
+      if ($endpos) {
+          $solr_query = urldecode(substr($_SERVER['REQUEST_URI'],18,$endpos-18));
+      }
+      else {
+          $solr_query = urldecode(substr($_SERVER['REQUEST_URI'],18));
+      }
+
+      if (trim($solr_query) == '') $solr_query = '*';
+
+      // check for search type
+      $search_type = '';
+      $colonpos = strpos($solr_query, ':');
+      if ($colonpos > 0) {
+          $search_type = substr($solr_query,0,$colonpos);
+          if (strpos($search_type,'_') > 0) {
+              $solr_query = substr($solr_query,$colonpos+1);
+          }
+          else {
+              $search_type = '';
+          }
+      }
+
+      $search_url .= '?q=' . urlencode($solr_query);
+
+      if (strlen($search_type) > 0) {
+          $search_url .= '&searchtype=' . urlencode($search_type);
+      }
+
+      $params = $_GET;
+
+      if (isset($params['f']) && is_array($params['f'])) {
+          foreach ($params['f'] as $facet) {
+              $search_url .= '&c=' . urlencode($facet);
+          }
+      }
+
+      if (isset($params['collection'])) {
+          $search_url .= '&collection=' . urlencode($params['collection']);
+      }
+
+      if (isset($params['page'])) {
+          $search_url .= '&page=' . urlencode($params['page']);
+      }
+
+      $script .= 'var _trackSearch = "' . $search_url . '";';
+
     }
 
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
