@@ -233,10 +233,14 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
 
     // check for IID identifier
     $iid_count = 0;
+    $digitool_count = 0;
     if (isset($mods_xml->identifier)) {
             foreach ($mods_xml->identifier as $identifier) {
               if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
                 $iid_count += 1;
+              }
+              if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'digitool') == 0)&&(strlen(trim($identifier)) > 0)) {
+                $digitool_count += 1;
               }
             }
     }
@@ -249,7 +253,8 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
         if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
             $purl_id = str_replace('http://purl.flvc.org','',$purl);
-            if (($owning_institution == 'fsu')||($owning_institution == 'fau')) {
+            // if no digitool id on ingest, go ahead and create the purl
+            if ($digitool_count == 0) {
                 $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
                 //drupal_set_message(t($command));
                 $execout = array();
