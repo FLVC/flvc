@@ -393,10 +393,13 @@ function flvc_page_alter(&$page) {
             // at a non-collection object
 
             // check for isComponentOf
+            $component_of = array();
             $view_object = islandora_object_load($query_pid);
-            $component_of = $view_object->relationships->get(ISLANDORA_RELS_EXT_URI, 'isComponentOf');
-            if (count($component_of) > 0) {
-                $query_pid = $component_of[0]['object']['value'];
+            if ((isset($view_object))&&($view_object != FALSE)) {
+              $component_of = $view_object->relationships->get(ISLANDORA_RELS_EXT_URI, 'isComponentOf');
+              if (count($component_of) > 0) {
+                  $query_pid = $component_of[0]['object']['value'];
+              }
             }
 
             // special processing if at a newspaper issue, newspaper page, book page, intermediate object, or isComponentOf
