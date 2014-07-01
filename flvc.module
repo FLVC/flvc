@@ -117,6 +117,11 @@ function iid_validate_edit($form, &$form_state) {
   $form_action = explode('/',$form['#action']);
   $edit_object_pid = urldecode($form_action[3]);
 
+  $object = islandora_object_load($edit_object_pid);
+  if (in_array('islandora:intermediateCModel', $object->models)) {
+    return;
+  }
+
   $iid_count = 0;
   for ($i=0; $i<$identifier_count; $i++)
   {
@@ -341,6 +346,7 @@ function flvc_page_alter(&$page) {
   $content_model = '';
   $query_root = variable_get('islandora_repository_pid', 'islandora:root');
   $fedora_object = islandora_object_load($query_root);
+  $view_pid = '';
 
   $collection_selected = isset($_GET['collection']) ? $_GET['collection'] : '';
   if (!empty($collection_selected)) {
@@ -386,10 +392,19 @@ function flvc_page_alter(&$page) {
           {
             // at a non-collection object
 
-            // special processing if at a newspaper issue, newspaper page, or book page object
+            // check for isComponentOf
+            $view_object = islandora_object_load($query_pid);
+            $component_of = $view_object->relationships->get(ISLANDORA_RELS_EXT_URI, 'isComponentOf');
+            if (count($component_of) > 0) {
+                $query_pid = $component_of[0]['object']['value'];
+            }
+
+            // special processing if at a newspaper issue, newspaper page, book page, intermediate object, or isComponentOf
             if ((strpos($object_content_type, 'pageCModel'))||
                 (strpos($object_content_type, 'newspaperIssueCModel'))||
-                (strpos($object_content_type, 'newspaperPageCModel')))
+                (strpos($object_content_type, 'newspaperPageCModel'))||
+                (strpos($object_content_type, 'intermediateCModel'))||
+                (count($component_of) > 0))
             {
                 $query_book = 'select $parentObject $collection from <#ri>
                         where (
@@ -491,6 +506,27 @@ function flvc_page_alter(&$page) {
       }
 
       $script .= 'var _trackSearch = "' . $search_url . '";';
+
+    }
+
+    if ((strlen($content_model) > 0)&&($content_model == 'islandora:intermediateCModel')) {
+        $pdf_query = <<<EOQ
+SELECT ?pdf FROM <#ri> WHERE {
+  ?pdf <http://islandora.ca/ontology/relsext#isComponentOf> <info:fedora/!pid>
+  }
+EOQ;
+        $pdf_query = format_string($pdf_query, array(
+          '!pid' => $view_pid,
+        ));
+        $pdf_count = 0;
+        $results = $fedora_object->repository->ri->sparqlQuery($pdf_query);
+        foreach ($results as $result) {
+          $pdf_id = $result['pdf']['value'];
+          $pdf_count++;
+        }
+        if (($pdf_count == 1)&&(!user_is_logged_in())) {
+            drupal_goto('islandora/object/' . $pdf_id);
+        }
 
     }
 
