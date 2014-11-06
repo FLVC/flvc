@@ -8,6 +8,68 @@
  *
  */
 
+/**
+ * Implements hook_menu().
+ */
+function flvc_menu() {
+  return array(
+    'islandora/object/%islandora_object/toc2' => array(
+      'title' => 'Table of Contents 2',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'flvc_toc_menu',
+      'page arguments' => array(2),
+      'access callback' => 'flvc_toc_access_callback',
+      'access arguments' => array(2),
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function flvc_theme() {
+  return array(
+    'flvc_toc' => array(
+      'arguments' => array('object' => NULL),
+      'file' => 'theme/theme.inc',
+      'template' => 'theme/islandora-toc',
+    ),
+  );
+}
+
+/**
+ * Determine whether or not to show this modules table of contents tab.
+ *
+ * @param FedoraObject $object
+ *   The book object.
+ *
+ * @return bool
+ *   TRUE if it should be shown, and FALSE if it should not be shown.
+ */
+function flvc_toc_access_callback($object = NULL) {
+  //return TRUE;
+  if (!isset($object)) {
+    return FALSE;
+  }
+  $is_book = in_array('islandora:bookCModel', $object->models);
+  $is_issue = in_array('islandora:newspaperIssueCModel', $object->models);
+  $is_toc = isset($object['TOC']);
+  return ($is_book || $is_issue) && $is_toc && islandora_object_access_callback(FEDORA_VIEW_OBJECTS, $object);
+}
+
+/**
+ * Renders the Table of Contents local menu task.
+ *
+ * @param FedoraObject $object
+ *   The book object to fetch the pages from.
+ *
+ * @return string
+ *   The HTML repersentation of the given books pages.
+ */
+function flvc_toc_menu(FedoraObject $object) {
+  return theme('flvc_toc', array('object' => $object));
+  //return '';
+}
 
 function flvc_form_alter(&$form, $form_state, $form_id) {
 
