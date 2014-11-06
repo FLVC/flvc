@@ -14,7 +14,7 @@
 function flvc_menu() {
   return array(
     'islandora/object/%islandora_object/toc2' => array(
-      'title' => 'Table of Contents 2',
+      'title' => 'Table of Contents',
       'type' => MENU_LOCAL_TASK,
       'page callback' => 'flvc_toc_menu',
       'page arguments' => array(2),
