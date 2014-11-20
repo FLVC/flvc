@@ -13,7 +13,7 @@
  */
 function flvc_menu() {
   return array(
-    'islandora/object/%islandora_object/toc2' => array(
+    'islandora/object/%islandora_object/toc' => array(
       'title' => 'Table of Contents',
       'type' => MENU_LOCAL_TASK,
       'page callback' => 'flvc_toc_menu',
@@ -21,6 +21,24 @@ function flvc_menu() {
       'access callback' => 'flvc_toc_access_callback',
       'access arguments' => array(2),
     ),
+    'islandora/tree_edit/%islandora_object/TOC' => array(
+      'title' => 'Edit Table of Contents',
+      'type' => MENU_CALLBACK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('flvc_toc_edit_form', 2),
+      'access callback' => 'flvc_toc_edit_access_callback',
+      'access arguments' => array(2),
+    ),
+/*
+    'islandora/tree_edit/%islandora_object/TOC' => array(
+      'title' => 'Edit Table of Contents',
+      'type' => MENU_CALLBACK,
+      'page callback' => 'flvc_toc_edit_menu',
+      'page arguments' => array(2),
+      'access callback' => 'flvc_toc_access_callback',
+      'access arguments' => array(2),
+    ),
+*/
   );
 }
 
@@ -33,6 +51,11 @@ function flvc_theme() {
       'arguments' => array('object' => NULL),
       'file' => 'theme/theme.inc',
       'template' => 'theme/islandora-toc',
+    ),
+    'flvc_toc_edit' => array(
+      'arguments' => array('object' => NULL),
+      'file' => 'theme/theme.inc',
+      'template' => 'theme/islandora-toc-edit',
     ),
   );
 }
@@ -47,14 +70,32 @@ function flvc_theme() {
  *   TRUE if it should be shown, and FALSE if it should not be shown.
  */
 function flvc_toc_access_callback($object = NULL) {
-  //return TRUE;
   if (!isset($object)) {
     return FALSE;
   }
   $is_book = in_array('islandora:bookCModel', $object->models);
   $is_issue = in_array('islandora:newspaperIssueCModel', $object->models);
   $is_toc = isset($object['TOC']);
-  return ($is_book || $is_issue) && $is_toc && islandora_object_access_callback(FEDORA_VIEW_OBJECTS, $object);
+  return ($is_book || $is_issue) && $is_toc && islandora_object_access_callback(ISLANDORA_VIEW_OBJECTS, $object);
+}
+
+/**
+ * Determine whether or not to show this modules table of contents tab.
+ *
+ * @param FedoraObject $object
+ *   The book object.
+ *
+ * @return bool
+ *   TRUE if it should be shown, and FALSE if it should not be shown.
+ */
+function flvc_toc_edit_access_callback($object = NULL) {
+  if (!isset($object)) {
+    return FALSE;
+  }
+  $is_book = in_array('islandora:bookCModel', $object->models);
+  $is_issue = in_array('islandora:newspaperIssueCModel', $object->models);
+  $is_toc = isset($object['TOC']);
+  return ($is_book || $is_issue) && $is_toc && islandora_object_access_callback(ISLANDORA_METADATA_EDIT, $object);
 }
 
 /**
@@ -69,6 +110,69 @@ function flvc_toc_access_callback($object = NULL) {
 function flvc_toc_menu(FedoraObject $object) {
   return theme('flvc_toc', array('object' => $object));
   //return '';
+}
+
+/**
+ * Renders the Table of Contents edit task.
+ *
+ * @param FedoraObject $object
+ *   The book object to fetch the pages from.
+ *
+ * @return string
+ *   The HTML repersentation of the given books pages.
+ */
+/*
+function flvc_toc_edit_menu(FedoraObject $object) {
+  return theme('flvc_toc_edit', array('object' => $object));
+  //return '';
+}
+*/
+
+function flvc_toc_edit_form(array $form, array &$form_state, AbstractObject $object) {
+
+  $form_state['object'] = $object;
+
+  $toc_string = $object['TOC']->content;
+
+  $form['toctext'] = array(
+    '#title' => t('TOC'),
+    '#type' => 'textarea',
+    '#rows' => 30,
+    '#cols' => 100,
+    '#default_value' => $toc_string,
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update')
+  );
+
+  return $form;
+}
+
+function flvc_toc_edit_form_submit($form, &$form_state) {
+  $object = $form_state['object'];
+  $new_toc = $form_state['values']['toctext'];
+
+  $toc_entries = array();
+  $toc_entries = drupal_json_decode($new_toc, true);
+
+  $new_sequence_num = 1;
+
+  $last_sequence_num = 1;
+
+  for ($i=0; $i < count($toc_entries['table_of_contents']); $i++) {
+
+    $old_sequence_num = intval($toc_entries['table_of_contents'][$i]['pagenum']);
+    if (($i > 0)&&($old_sequence_num != $last_sequence_num)) {
+      $new_sequence_num++;
+    }
+    $last_sequence_num = $old_sequence_num;
+    $toc_entries['table_of_contents'][$i]['pagenum'] = $new_sequence_num;
+
+  }
+
+  drupal_set_message(drupal_json_encode($toc_entries));
 }
 
 function flvc_form_alter(&$form, $form_state, $form_id) {
@@ -615,3 +719,20 @@ EOQ;
     drupal_add_js($script, array('scope' => 'header', 'type' => 'inline'));
  
 }
+
+/**
+ * Implements hook_islandora_edit_datastream_registry().
+ */
+/*
+function flvc_islandora_edit_datastream_registry(AbstractObject $object, AbstractDatastream $datastream) {
+  if ($datastream->id == 'TOC') {
+    return array(
+      array(
+        'Name' => t('edit table of contents'),
+        'url' => "islandora/tree_edit/{$object->id}/{$datastream->id}",
+        'weight' => 6,
+      ),
+    );
+  }
+}
+*/
