@@ -39,6 +39,20 @@ function flvc_menu() {
       'access arguments' => array(2),
     ),
 */
+    'islandora_solr/autocomplete_text_fields' => array(
+      'title' => 'Islandora Solr Luke autocomplete',
+      'description' => 'Autocomplete callback to populate solr text fields.',
+      'page callback' => 'flvc_solr_autocomplete_text_fields',
+      'access arguments' => array('administer islandora solr'),
+      'type' => MENU_CALLBACK,
+    ),
+    'islandora_solr/autocomplete_string_fields' => array(
+      'title' => 'Islandora Solr Luke autocomplete',
+      'description' => 'Autocomplete callback to populate solr string fields.',
+      'page callback' => 'flvc_solr_autocomplete_string_fields',
+      'access arguments' => array('administer islandora solr'),
+      'type' => MENU_CALLBACK,
+    ),
   );
 }
 
@@ -736,3 +750,61 @@ function flvc_islandora_edit_datastream_registry(AbstractObject $object, Abstrac
   }
 }
 */
+
+/**
+ * Admin autocomplete callback which returns solr fields from Luke.
+ *
+ * @param string $string
+ *   String filled out in the autocomplete textfield.
+ *
+ * @return json
+ *   A json array containing the Solr luke values that contain the given string.
+ */
+function flvc_solr_autocomplete_text_fields($string = '') {
+
+  $luke = islandora_solr_get_luke();
+  $result = array();
+  foreach ($luke['fields'] as $term => $value) {
+    if ((stripos($term, '_mt') !== FALSE)&&(stripos($term, $string) !== FALSE)) {
+      // Search case insensitive, but keep the case on replace.
+      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term);
+
+      // Add strong elements to highlight the found string.
+      $result[$term] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
+    }
+  }
+  // Sort alphabetically.
+  ksort($result);
+
+  drupal_json_output($result);
+  exit();
+}
+
+/**
+ * Admin autocomplete callback which returns solr fields from Luke.
+ *
+ * @param string $string
+ *   String filled out in the autocomplete textfield.
+ *
+ * @return json
+ *   A json array containing the Solr luke values that contain the given string.
+ */
+function flvc_solr_autocomplete_string_fields($string = '') {
+
+  $luke = islandora_solr_get_luke();
+  $result = array();
+  foreach ($luke['fields'] as $term => $value) {
+    if ((stripos($term, '_ms') !== FALSE)&&(stripos($term, $string) !== FALSE)) {
+      // Search case insensitive, but keep the case on replace.
+      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term);
+
+      // Add strong elements to highlight the found string.
+      $result[$term] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
+    }
+  }
+  // Sort alphabetically.
+  ksort($result);
+
+  drupal_json_output($result);
+  exit();
+}
