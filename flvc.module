@@ -29,6 +29,22 @@ function flvc_menu() {
       'access callback' => 'flvc_toc_edit_access_callback',
       'access arguments' => array(2),
     ),
+    'islandora/object/%islandora_object/report' => array(
+      'title' => 'Report',
+      'type' => MENU_LOCAL_TASK,
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('flvc_report_form',2),
+      'access callback' => 'flvc_report_access_callback',
+      'access arguments' => array(2),
+    ),
+    'islandora/object/%islandora_object/report/results' => array(
+      'title' => 'Report Results',
+      'type' => MENU_CALLBACK,
+      'page callback' => 'flvc_report_results',
+      'page arguments' => array(2),
+      'access callback' => 'flvc_report_access_callback',
+      'access arguments' => array(2),
+    ),
 /*
     'islandora/tree_edit/%islandora_object/TOC' => array(
       'title' => 'Edit Table of Contents',
@@ -43,14 +59,14 @@ function flvc_menu() {
       'title' => 'Islandora Solr Luke autocomplete',
       'description' => 'Autocomplete callback to populate solr text fields.',
       'page callback' => 'flvc_solr_autocomplete_text_fields',
-      'access arguments' => array('administer islandora solr'),
+      'access arguments' => array(ISLANDORA_METADATA_EDIT),
       'type' => MENU_CALLBACK,
     ),
     'islandora_solr/autocomplete_string_fields' => array(
       'title' => 'Islandora Solr Luke autocomplete',
       'description' => 'Autocomplete callback to populate solr string fields.',
       'page callback' => 'flvc_solr_autocomplete_string_fields',
-      'access arguments' => array('administer islandora solr'),
+      'access arguments' => array(ISLANDORA_METADATA_EDIT),
       'type' => MENU_CALLBACK,
     ),
   );
@@ -187,6 +203,208 @@ function flvc_toc_edit_form_submit($form, &$form_state) {
   }
 
   drupal_set_message(drupal_json_encode($toc_entries));
+}
+
+function flvc_report_access_callback($object = NULL) {
+  if (!isset($object)) {
+    return FALSE;
+  }
+  return in_array('islandora:collectionCModel', $object->models) && islandora_object_access_callback(ISLANDORA_METADATA_EDIT, $object);
+}
+
+function flvc_report_form(array $form, array &$form_state, AbstractObject $object) {
+
+  $form_state['object'] = $object;
+
+  $form['report_desc'] = array(
+      '#type' => 'markup',
+      '#markup' => '<h3>' . $object->label . '</h3>Report of object counts for this collection and any child collections, grouped by content model.  Note - counts objects directly under each collection.  Counts do not currently include children of book, newspaper, or serial objects (issue, page, and serial pdf objects).<br><br>',
+  );
+
+  $form['show_br'] = array(
+      '#type' => 'markup',
+      '#markup' => 'Optional - enter beginning and/or ending create dates:<br>',
+  );
+
+  $form['createdate1'] = array(
+      '#size' => '10',
+      '#type' => 'textfield',
+      '#title' => 'Created from date (YYYY-MM-DD):',
+      '#default_value' => '',
+  );
+
+  $form['createdate2'] = array(
+      '#size' => '10',
+      '#type' => 'textfield',
+      '#title' => 'Created to date (YYYY-MM-DD):',
+      '#default_value' => '',
+  );
+
+  $form['show_br_2'] = array(
+      '#type' => 'markup',
+      '#markup' => '<br>Optional - search Solr field:<br>',
+  );
+
+  $form['search'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array(
+        'container-inline')
+      )
+  );
+
+  $form['search']['solrfield'] = array(
+    '#size' => '45',
+    '#type' => 'textfield',
+    '#title' => '',
+    '#autocomplete_path' => 'islandora_solr/autocomplete_text_fields',
+    '#default_value' => '',
+  );
+
+  $form['search']['solrsearch'] = array(
+    '#size' => '20',
+    '#type' => 'textfield',
+    '#title' => '',
+    '#default_value' => '',
+  );
+
+  $form['show_br_3'] = array(
+      '#type' => 'markup',
+      '#markup' => '<br><br>',
+  );
+
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Generate Report')
+  );
+
+  return $form;
+}
+
+function flvc_report_form_submit($form, &$form_state) {
+  $object = $form_state['object'];
+  $createdate1 = $form_state['values']['createdate1'];
+  $createdate2 = $form_state['values']['createdate2'];
+  $solrfield = $form_state['values']['solrfield'];
+  $solrsearch = $form_state['values']['solrsearch'];
+  $params = array();
+  if (strlen($createdate1) > 0) {
+    $params = array_merge($params, array('cdate1' => $createdate1));
+  }
+  if (strlen($createdate2) > 0) {
+    $params = array_merge($params, array('cdate2' => $createdate2));
+  }
+  if ((strlen($solrfield) > 0)&&(strlen($solrsearch) > 0)) {
+    $params = array_merge($params, array('solrfield' => str_replace('.','_',$solrfield) . '_mt', 'solrsearch' => $solrsearch));
+  }
+  $form_state['redirect'] = array('islandora/object/' . $object->id . '/report/results', array('query' => $params));
+}
+
+function flvc_report_results(FedoraObject $object) {
+
+  $createdate1 = isset($_GET['cdate1']) ? $_GET['cdate1'] : '';
+  $createdate2 = isset($_GET['cdate2']) ? $_GET['cdate2'] : '';
+  $datefilter = '';
+  if ((strlen($createdate1) > 0)&&(strlen($createdate2) > 0)) {
+      $datefilter = 'fgs_createdDate_dt:[' . $createdate1 . 'T00:00:00Z TO ' . $createdate2 . 'T00:00:00Z]';
+  }
+  else if ((strlen($createdate1) == 0)&&(strlen($createdate2) > 0)) {
+      $datefilter = 'fgs_createdDate_dt:[* TO ' . $createdate2 . 'T00:00:00Z]';
+  }
+  else if ((strlen($createdate1) > 0)&&(strlen($createdate2) == 0)) {
+      $datefilter = 'fgs_createdDate_dt:[' . $createdate1 . 'T00:00:00Z TO ' . date('Y-m-d') . 'T00:00:00Z]';
+  }
+
+  $solrquery = '*:*';
+  $solrfield = isset($_GET['solrfield']) ? $_GET['solrfield'] : '';
+  $solrsearch = isset($_GET['solrsearch']) ? $_GET['solrsearch'] : '';
+  if ((strlen($solrfield) > 0)&&(strlen($solrsearch) > 0)) {
+    $solrquery = $solrfield . ':' . $solrsearch;
+  }
+
+  $content_models = array(
+    'islandora:collectionCModel',
+    'islandora:sp-audioCModel',
+    'islandora:sp_basic_image',
+    'islandora:binaryObjectCModel',
+    'islandora:bookCModel',
+    'islandora:compoundCModel',
+    'islandora:sp_large_image_cmodel',
+    'islandora:newspaperCModel',
+    'islandora:sp_pdf',
+    'islandora:rootSerialCModel',
+    'islandora:sp_videoCModel',
+  );
+
+  $parsed_url = parse_url(variable_get('islandora_solr_url', 'http://localhost:8080/solr'));
+  $solr = new Apache_Solr_Service($parsed_url['host'], $parsed_url['port'], $parsed_url['path']);
+
+  $msg = 'collection id, audio, basic image, binary, book, collection, compound, large image, newspaper, pdf, serial, video' . "\n";
+  $collections = array();
+  $collections[] = $object->id;
+
+  $query = 'select $subject $object from <#ri>
+           where  $subject <fedora-model:hasModel> <info:fedora/islandora:collectionCModel>
+           and walk($subject <fedora-rels-ext:isMemberOfCollection> <info:fedora/' . $object->id . '>
+           and $subject <fedora-rels-ext:isMemberOfCollection> $object)
+           and $subject <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
+           order by $subject';
+  $results = $object->repository->ri->itqlQuery($query, 'unlimited');
+  foreach ($results as $result) {
+    $collections[] = $result['subject']['value'];
+  }
+
+  $header = array();
+  $header[] = array('data' => t('collection ID'));
+  $header[] = array('data' => t('collection'));
+  $header[] = array('data' => t('audio'));
+  $header[] = array('data' => t('basic image'));
+  $header[] = array('data' => t('binary'));
+  $header[] = array('data' => t('book'));
+  $header[] = array('data' => t('compound'));
+  $header[] = array('data' => t('large image'));
+  $header[] = array('data' => t('newspaper'));
+  $header[] = array('data' => t('pdf'));
+  $header[] = array('data' => t('serial'));
+  $header[] = array('data' => t('video'));
+  $header[] = array('data' => t('total'));
+  $rows = array();
+
+  foreach ($collections as $collection) {
+    $msg .= $collection;
+    $total_count = 0;
+    $row = array();
+    $row[] = array('data' => $collection);
+
+    foreach ($content_models as $content_model) {
+      $filters = array();
+      $filters[] = 'RELS_EXT_isMemberOfCollection_uri_ms:info\:fedora/' . str_replace(':','\:',$collection);
+      $filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/' . str_replace(':','\:',$content_model);
+      if (strlen($datefilter) > 0) {
+        $filters[] = $datefilter;
+      }
+      $params = array(
+        'rows' => 0,
+        'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+        'fq' => $filters,
+      );
+
+      // Solr results in JSON format.
+      $result_object = json_decode($solr->search($solrquery, 0, 0, $params)->getRawResponse(), TRUE);
+
+      $count = $result_object['response']['numFound'];
+      $msg .= ',' . $count;
+      $row[] = array('data' => $count);
+      $total_count += $count;
+    }
+    $msg .= "\n";
+    $row[] = $total_count;
+    $rows[] = $row;
+  }
+
+  $output = theme('table', array('header' => $header, 'rows' => $rows));
+  return $output;
 }
 
 function flvc_form_alter(&$form, $form_state, $form_id) {
@@ -765,12 +983,15 @@ function flvc_solr_autocomplete_text_fields($string = '') {
   $luke = islandora_solr_get_luke();
   $result = array();
   foreach ($luke['fields'] as $term => $value) {
-    if ((stripos($term, '_mt') !== FALSE)&&(stripos($term, $string) !== FALSE)) {
+    if ((stripos($term, '_mt') !== FALSE)&&(stripos(str_replace('_','.',$term), $string) !== FALSE)) {
+      $term2 = str_replace('_mt','',$term);
+      $term3 = str_replace('_','.',$term2);
+
       // Search case insensitive, but keep the case on replace.
-      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term);
+      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term3);
 
       // Add strong elements to highlight the found string.
-      $result[$term] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
+      $result[$term3] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
     }
   }
   // Sort alphabetically.
@@ -794,12 +1015,15 @@ function flvc_solr_autocomplete_string_fields($string = '') {
   $luke = islandora_solr_get_luke();
   $result = array();
   foreach ($luke['fields'] as $term => $value) {
-    if ((stripos($term, '_ms') !== FALSE)&&(stripos($term, $string) !== FALSE)) {
+    if ((stripos($term, '_ms') !== FALSE)&&(stripos(str_replace('_','.',$term), $string) !== FALSE)) {
+      $term2 = str_replace('_ms','',$term);
+      $term3 = str_replace('_','.',$term2);
+
       // Search case insensitive, but keep the case on replace.
-      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term);
+      $term_str = preg_replace("/$string/i", "<strong>\$0</strong>", $term3);
 
       // Add strong elements to highlight the found string.
-      $result[$term] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
+      $result[$term3] = $term_str . '<strong style="position: absolute; right: 5px;">(' . $value['type'] . ')</strong>';
     }
   }
   // Sort alphabetically.
