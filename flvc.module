@@ -69,6 +69,22 @@ function flvc_menu() {
       'access arguments' => array(ISLANDORA_METADATA_EDIT),
       'type' => MENU_CALLBACK,
     ),
+/*
+    'admin/reports/google-analytics-all-views' => array(
+      'title' => 'Google Analytics Views',
+      'description' => "Views based on traffic data for your site.",
+      'page callback' => 'flvc_google_analytics_all_views',
+      'access arguments' => array(ISLANDORA_METADATA_EDIT),
+      'type' => MENU_NORMAL_ITEM,
+    ),
+    'islandora/reports/google-analytics-all-views' => array(
+      'title' => 'Google Analytics Views',
+      'description' => "Views based on traffic data for your site.",
+      'page callback' => 'flvc_google_analytics_all_views',
+      'access arguments' => array(ISLANDORA_METADATA_EDIT),
+      'type' => MENU_NORMAL_ITEM,
+    ),
+*/
   );
 }
 
@@ -417,7 +433,7 @@ function flvc_form_alter(&$form, $form_state, $form_id) {
     }
   }
 
-  if ($form_id == 'xml_form_builder_edit_datastream_form')
+  if ($form_id == 'xml_form_builder_datastream_form')
   {
       if (!isset($form['available_forms']))
       {
@@ -430,6 +446,7 @@ function iid_validate_ingest($form, &$form_state) {
 
   $errmsg = 'The following IID identifiers already exist: ';
   $error_IID_numbers = '';
+  $error_IID_badchars = '';
 
   // do not validate if no flvc extension with owning institution
   if (!isset($form['extension']['flvc']['owningInst']['#value'])) {
@@ -447,6 +464,11 @@ function iid_validate_ingest($form, &$form_state) {
     if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp(trim($form['id'][$i]['type']['#value']), 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
     {
       $iid_count += 1;
+
+      if (preg_match("/[^A-Za-z0-9_\-()\.]/", $form['id'][$i]['identifier']['#value'])) {
+        $error_IID_badchars .= $form['id'][$i]['identifier']['#value'] . ' ';
+      }
+
       $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
 
       $results = file_get_contents($solr_url);
@@ -464,6 +486,10 @@ function iid_validate_ingest($form, &$form_state) {
 
   if ($iid_count == 0) {
     form_set_error('', t('You must enter an IID identifier.'));
+  }
+
+  if (strlen($error_IID_badchars) > 0) {
+    form_set_error('', t('The following IID identifiers have illegal characters (characters can be alphanumeric, underscore, hyphen, period, or parentheses with no spaces): %iidnums', array('%iidnums' => $error_IID_badchars)));
   }
 
   if (strlen($error_IID_numbers) > 0) {
@@ -512,6 +538,7 @@ function iid_validate_ingest($form, &$form_state) {
 function iid_validate_edit($form, &$form_state) {
 
   $error_IID_numbers = '';
+  $error_IID_badchars = '';
 
   // do not validate if no flvc extension with owning institution
   if (!isset($form['extension']['flvc']['owningInst']['#value'])) {
@@ -537,6 +564,11 @@ function iid_validate_edit($form, &$form_state) {
     if ( (isset($form['id'][$i]['identifier']['#value']))&&(isset($form['id'][$i]['type']['#value']))&&(strcasecmp(trim($form['id'][$i]['type']['#value']), 'IID') == 0)&&(strlen(trim($form['id'][$i]['identifier']['#value'])) > 0) )
     {
       $iid_count += 1;
+
+      if (preg_match("/[^A-Za-z0-9_\-()\.]/", $form['id'][$i]['identifier']['#value'])) {
+        $error_IID_badchars .= $form['id'][$i]['identifier']['#value'] . ' ';
+      }
+
       $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
 
       $results = file_get_contents($solr_url);
@@ -559,6 +591,10 @@ function iid_validate_edit($form, &$form_state) {
 
   if ($iid_count == 0) {
     form_set_error('', t('You must enter an IID identifier.'));
+  }
+
+  if (strlen($error_IID_badchars) > 0) {
+    form_set_error('', t('The following IID identifiers have illegal characters (characters can be alphanumeric, underscore, hyphen, period, or parentheses with no spaces): %iidnums', array('%iidnums' => $error_IID_badchars)));
   }
 
   if (strlen($error_IID_numbers) > 0) {
@@ -1031,4 +1067,10 @@ function flvc_solr_autocomplete_string_fields($string = '') {
 
   drupal_json_output($result);
   exit();
+}
+
+function flvc_google_analytics_all_views() {
+  $output = views_embed_view('top_site_searches');
+  $output .= views_embed_view('top_facet_searches');
+  return $output;
 }
