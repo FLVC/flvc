@@ -16,6 +16,27 @@ function flvc_drush_command() {
     'drupal dependencies' => array('islandora_xacml_editor'),
   );
 
+  $items['flvc_change_parent'] = array(
+    'description' => 'Change the parent relationship of an object.',
+    'drupal dependencies' => array('islandora'),
+    'options' => array(
+      'object' => array(
+        'description' => 'The PID of the object to change.',
+        'required' => TRUE,
+      ),
+      'parent' => array(
+        'description' => 'The PID of the parent object.',
+        'required' => TRUE,
+      ),
+      'parent_relationship_pred' => array(
+        'description' => 'The predicate of the relationship to the parent. ' .
+        'Defaults to "isMemberOf".',
+        'value' => 'optional',
+      ),
+    ),
+    'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN,
+  );
+
   return $items;
 }
 
@@ -99,4 +120,28 @@ EOQ;
       ));
     }
   } //foreach
+}
+
+function drush_flvc_change_parent() {
+  drupal_load('module', 'islandora');
+  $connection = islandora_get_tuque_connection();
+
+  $object_pid = drush_get_option('object');
+  $parent_pid = drush_get_option('parent');
+  $parent_relationship_pred = drush_get_option('parent_relationship_pred', 'isMemberOf');
+
+  $object = islandora_object_load($object_pid);
+  if ($object) {
+    $rels = $object->relationships;
+    //$parents = $rels->get(FEDORA_RELS_EXT_URI, $parent_relationship_pred);
+    //$rels->autoCommit = FALSE;
+    $rels->remove(FEDORA_RELS_EXT_URI, $parent_relationship_pred);
+    $rels->add(FEDORA_RELS_EXT_URI, $parent_relationship_pred, $parent_pid);
+    $rels->commitRelationships();
+  }
+  else {
+        watchdog('flvc', 'No object loaded for @pid.', array(
+          '@pid' => $object_pid,
+        ));
+  }
 }

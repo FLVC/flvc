@@ -131,7 +131,7 @@ function flvc_toc_edit_access_callback($object = NULL) {
   $is_book = in_array('islandora:bookCModel', $object->models);
   $is_issue = in_array('islandora:newspaperIssueCModel', $object->models);
   $is_toc = isset($object['TOC']);
-  return ($is_book || $is_issue) && $is_toc && islandora_object_access_callback(ISLANDORA_METADATA_EDIT, $object);
+  return ($is_book || $is_issue) && $is_toc && user_has_role(user_role_load_by_name('administrator')->rid) && islandora_object_access_callback(ISLANDORA_METADATA_EDIT, $object);
 }
 
 /**
@@ -145,24 +145,7 @@ function flvc_toc_edit_access_callback($object = NULL) {
  */
 function flvc_toc_menu(FedoraObject $object) {
   return theme('flvc_toc', array('object' => $object));
-  //return '';
 }
-
-/**
- * Renders the Table of Contents edit task.
- *
- * @param FedoraObject $object
- *   The book object to fetch the pages from.
- *
- * @return string
- *   The HTML repersentation of the given books pages.
- */
-/*
-function flvc_toc_edit_menu(FedoraObject $object) {
-  return theme('flvc_toc_edit', array('object' => $object));
-  //return '';
-}
-*/
 
 function flvc_toc_edit_form(array $form, array &$form_state, AbstractObject $object) {
 
@@ -1069,9 +1052,8 @@ EOQ;
 /**
  * Implements hook_islandora_edit_datastream_registry().
  */
-/*
 function flvc_islandora_edit_datastream_registry(AbstractObject $object, AbstractDatastream $datastream) {
-  if ($datastream->id == 'TOC') {
+  if (($datastream->id == 'TOC')&&(user_has_role(user_role_load_by_name('administrator')->rid))) {
     return array(
       array(
         'Name' => t('edit table of contents'),
@@ -1081,7 +1063,6 @@ function flvc_islandora_edit_datastream_registry(AbstractObject $object, Abstrac
     );
   }
 }
-*/
 
 /**
  * Admin autocomplete callback which returns solr fields from Luke.
@@ -1152,3 +1133,48 @@ function flvc_google_analytics_all_views() {
   $output .= views_embed_view('top_facet_searches');
   return $output;
 }
+
+/**
+ * Implements hook_CMODEL_PID_islandora_view_object().
+ */
+function flvc_islandora_collectionCModel_islandora_view_object(AbstractObject $object) {
+
+  // determine number of child collection objects
+  $collection_query =  <<<EOQ
+SELECT ?object FROM <#ri> WHERE {
+  ?object <fedora-rels-ext:isMemberOfCollection> <info:fedora/!pid> ;
+        <fedora-model:hasModel> <info:fedora/islandora:collectionCModel> ;
+        <fedora-model:state> <fedora-model:Active> .
+}
+EOQ;
+  $collection_query = format_string($collection_query, array(
+    '!pid' => $object->id,
+  ));
+  $count = $object->repository->ri->countQuery($collection_query, 'sparql');
+
+  // if no child collection objects and user not logged in, redirect to search display
+  if (($count == 0)&&(!user_is_logged_in())) {
+    $params = array('type' => 'edismax', 'collection' => $object->id);
+    drupal_goto('islandora/search/', array('query' => $params));
+  }
+
+  // if no child collection objects and PALMM site and user not admin, redirect to search display
+  if (($count == 0)&&(substr($object->id, 0, 5) == 'palmm')&&(!user_has_role(user_role_load_by_name('administrator')->rid))) {
+    $params = array('type' => 'edismax', 'collection' => $object->id);
+    drupal_goto('islandora/search/', array('query' => $params));
+  }
+
+}
+
+
+/**
+ * Implements hook_islandora_object_alter().
+ */
+/*
+function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
+  // Set state to 'D' instead of deleting object 
+  if ($context['action'] == 'purge') {
+    $context['delete'] = TRUE;
+  }
+}
+*/
