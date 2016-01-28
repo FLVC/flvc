@@ -724,6 +724,11 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
     $purl_id = '';
 
     $mods_str = $object['MODS']->content;
+
+    // validate against schema
+    $valid = flvc_validate_schema($object, $mods_str);
+    //drupal_set_message('ingested valid = ' . $valid);
+
     $mods_xml = new SimpleXMLElement($mods_str);
 
     // check for owning institution
@@ -791,6 +796,11 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
     $purl_id = '';
 
     $mods_str = $object['MODS']->content;
+
+    // validate against schema
+    //$valid = flvc_validate_schema($object);
+    //drupal_set_message('modified valid = ' . $valid);
+
     $mods_xml = new SimpleXMLElement($mods_str);
 
     // check for owning institution
@@ -1163,11 +1173,99 @@ EOQ;
 /**
  * Implements hook_islandora_object_alter().
  */
-/*
 function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
   // Set state to 'D' instead of deleting object 
   if ($context['action'] == 'purge') {
     $context['delete'] = TRUE;
   }
 }
+
+
+function flvc_islandora_datastream_alter(AbstractObject $object, AbstractDatastream $datastream, array &$context) {
+
+  if (($datastream->id == 'MODS')&&($context['action'] == 'modify')) {
+
+    if ((isset($context['params']))&&(isset($context['params']['dsFile']))) {
+      $mods_str = file_get_contents($context['params']['dsFile']);
+      $valid = flvc_validate_schema($object, $mods_str);
+    }
+/*
+    foreach ($context['params'] as $name => $value) {
+      drupal_set_message('altering ' . $name . '  = ' . $value);
+      if ($name == 'dsFile') {
+        $file_found = 1;
+        $datastreamfile = $value;
+      }
+    }
 */
+  }
+
+}
+
+function flvc_validate_schema(AbstractObject $object, $mods_str) {
+
+  global $user;
+
+  //if (!isset($object['MODS']))
+  //    return false;
+
+  $error_msg = "Object " . $object->id . " has invalid MODS:<br><br>";
+
+  // check for IID identifier
+  $mods_xml = new SimpleXMLElement($mods_str);
+  $iid_count = 0;
+  if (isset($mods_xml->identifier)) {
+    foreach ($mods_xml->identifier as $identifier) {
+      if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
+        $iid_count += 1;
+      }
+    }
+  }
+  if ($iid_count == 0) {
+    $error_msg .= 'No IID identifier found<br><br>';
+  }
+
+  // validate MODS against schema
+  //$mods_str = $object['MODS']->content;
+  $mods_doc = new DOMDocument();
+  $mods_doc->loadXML($mods_str);
+  $mods_version = '';
+  $node= $mods_doc->documentElement;
+  foreach ($node->attributes as $attribute) {
+    if ($attribute->nodeName == 'version') {
+      $mods_version = $attribute->nodeValue;
+    }
+  }
+  if ($mods_version == '') {
+    $mods_version = '3.4';
+  }
+  libxml_use_internal_errors(true);
+  $valid = $mods_doc->schemaValidate('/usr/local/islandora/offline-ingest/lib/include/mods-' . str_replace('.','-',$mods_version) . '.xsd');
+  //drupal_set_message('version = ' . $mods_version . '    valid = ' . $valid);
+  //drupal_set_message('site_name = ' . variable_get('site_name'));
+  //drupal_set_message('site_mail = ' . variable_get('site_mail'));
+  //drupal_set_message('user mail = ' . $user->mail);
+
+  if (!$valid) {
+    //$error_msg .= "Object " . $object->id . " has invalid MODS:<br><br>";
+    $errors = libxml_get_errors();
+    foreach ($errors as $error) {
+        $error_msg .= $error->message . " on line " . $error->line . " column " . $error->column . "<br><br>";
+    }
+  }
+
+  if ((!$valid)||($iid_count == 0)) {
+    $params = array(
+      'body' => $error_msg,
+      'subject' => 'FL-Islandora Invalid MODS Report: ' . $object->id,
+      'headers'=>'simple',
+    );
+    $headers = "MIME-Version: 1.0" . "\r\n";
+    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+    $headers .= 'From: <' . variable_get('site_mail') . ">\r\n";
+    mail($user->mail, 'Invalid MODS Report: ' . $object->id, $error_msg, $headers);
+    libxml_clear_errors();
+  }
+  libxml_use_internal_errors(false);
+  return $valid;
+}
