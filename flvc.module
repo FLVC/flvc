@@ -406,11 +406,13 @@ function flvc_report_results(FedoraObject $object) {
     'islandora:sp_basic_image',
     'islandora:binaryObjectCModel',
     'islandora:bookCModel',
+    'ir:citationCModel',
     'islandora:compoundCModel',
     'islandora:sp_large_image_cmodel',
     'islandora:newspaperCModel',
     'islandora:sp_pdf',
     'islandora:rootSerialCModel',
+    'ir:thesisCModel',
     'islandora:sp_videoCModel',
   );
 
@@ -445,11 +447,13 @@ EOQ;
   $header[] = array('data' => t('basic image'));
   $header[] = array('data' => t('binary'));
   $header[] = array('data' => t('book'));
+  $header[] = array('data' => t('citation'));
   $header[] = array('data' => t('compound'));
   $header[] = array('data' => t('large image'));
   $header[] = array('data' => t('newspaper'));
   $header[] = array('data' => t('pdf'));
   $header[] = array('data' => t('serial'));
+  $header[] = array('data' => t('thesis'));
   $header[] = array('data' => t('video'));
   $header[] = array('data' => t('total'));
   $rows = array();
