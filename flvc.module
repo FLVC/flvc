@@ -567,6 +567,25 @@ function iid_validate_ingest($form, &$form_state) {
     form_set_error('', t('The following IID identifiers already exist: %iidnums', array('%iidnums' => $error_IID_numbers)));
   }
 
+  // other identifiers of type=IID are not allowed
+  $other_identifier_count = 0;
+  if (isset($form['id_otheridentifiers'])) {
+      $other_identifier_count = count($form['id_otheridentifiers']);
+  }
+  $other_iid_count = 0;
+  $error_other_IID_numbers = '';
+  for ($i=0; $i<$other_identifier_count; $i++)
+  {
+    if ( (isset($form['id_otheridentifiers'][$i]['identifier']['#value']))&&(isset($form['id_otheridentifiers'][$i]['type']['#value']))&&(strcasecmp(trim($form['id_otheridentifiers'][$i]['type']['#value']), 'IID') == 0)&&(strlen(trim($form['id_otheridentifiers'][$i]['identifier']['#value'])) > 0) )
+    {
+      $other_iid_count += 1;
+      $error_other_IID_numbers = $error_other_IID_numbers . $form['id_otheridentifiers'][$i]['identifier']['#value'] . ' ';
+    }
+  }
+  if ($other_iid_count > 0) {
+    form_set_error('', t('Additional IID identifiers are not allowed.  Change the type for the following identifiers: %iidnums', array('%iidnums' => $error_other_IID_numbers)));
+  }
+
   // check format of purls
   $server_error_purls = '';
   $error_purls = '';
@@ -670,6 +689,25 @@ function iid_validate_edit($form, &$form_state) {
 
   if (strlen($error_IID_numbers) > 0) {
     form_set_error('', t('The following IID identifiers already exist in other objects: %iidnums', array('%iidnums' => $error_IID_numbers)));
+  }
+
+  // other identifiers of type=IID are not allowed
+  $other_identifier_count = 0;
+  if (isset($form['id_otheridentifiers'])) {
+      $other_identifier_count = count($form['id_otheridentifiers']);
+  }
+  $other_iid_count = 0;
+  $error_other_IID_numbers = '';
+  for ($i=0; $i<$other_identifier_count; $i++)
+  {
+    if ( (isset($form['id_otheridentifiers'][$i]['identifier']['#value']))&&(isset($form['id_otheridentifiers'][$i]['type']['#value']))&&(strcasecmp(trim($form['id_otheridentifiers'][$i]['type']['#value']), 'IID') == 0)&&(strlen(trim($form['id_otheridentifiers'][$i]['identifier']['#value'])) > 0) )
+    {
+      $other_iid_count += 1;
+      $error_other_IID_numbers = $error_other_IID_numbers . $form['id_otheridentifiers'][$i]['identifier']['#value'] . ' ';
+    }
+  }
+  if ($other_iid_count > 0) {
+    form_set_error('', t('Additional IID identifiers are not allowed.  Change the type for the following identifiers: %iidnums', array('%iidnums' => $error_other_IID_numbers)));
   }
 
   // check format of purls
