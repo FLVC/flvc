@@ -1229,11 +1229,9 @@ EOQ;
 /**
  * Implements hook_islandora_object_alter().
  */
-/*
 function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
   // Set state to 'D' instead of deleting object 
   if ($context['action'] == 'purge') {
     $context['delete'] = TRUE;
   }
 }
-*/
