@@ -13,6 +13,14 @@
  */
 function flvc_menu() {
   return array(
+   'admin/islandora/tools/flvc' => array(
+      'title' => 'FLVC Module Settings',
+      'description' => 'Settings for FLVC Module.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('flvc_admin_form'),
+      'access arguments' => array('administer islandora solr'),
+      'file' => 'includes/admin.form.inc',
+    ),
     'islandora/object/%islandora_object/toc' => array(
       'title' => 'Table of Contents',
       'type' => MENU_LOCAL_TASK,
@@ -1233,5 +1241,15 @@ function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
   // Set state to 'D' instead of deleting object 
   if ($context['action'] == 'purge') {
     $context['delete'] = TRUE;
+  }
+}
+
+function flvc_islandora_solr_query($islandora_solr_query) {
+  // check site configuration to include collection objects in user searches
+  $include_collections = variable_get('flvc_include_collections_in_search', FALSE);
+  if (!($include_collections)) {
+      if (strstr(current_path(), 'islandora/search')) {
+        $islandora_solr_query->solrParams['fq'][] = '-RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:collectionCModel';
+      }
   }
 }
