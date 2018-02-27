@@ -1206,6 +1206,24 @@ function flvc_google_analytics_all_views() {
  */
 function flvc_islandora_collectionCModel_islandora_view_object(AbstractObject $object) {
 
+  $display_empty_view = variable_get('flvc_display_view_for_empty_collections', FALSE);
+  if ($display_empty_view) {
+    $child_query =  <<<EOQ
+SELECT ?object FROM <#ri> WHERE {
+  ?object <fedora-rels-ext:isMemberOfCollection> <info:fedora/!pid> ;
+        <fedora-model:state> <fedora-model:Active> .
+}
+EOQ;
+    $child_query = format_string($child_query, array(
+      '!pid' => $object->id,
+    ));
+    $count = $object->repository->ri->countQuery($child_query, 'sparql');
+    if ($count == 0) {
+      return;
+    }
+
+  }
+
   // determine number of child collection objects
   $collection_query =  <<<EOQ
 SELECT ?object FROM <#ri> WHERE {
