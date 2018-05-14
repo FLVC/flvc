@@ -430,23 +430,8 @@ function flvc_report_results(FedoraObject $object) {
   $msg = 'collection id, audio, basic image, binary, book, collection, compound, large image, newspaper, pdf, serial, video' . "\n";
   $collections = array();
   $collections[] = $object->id;
-  $query = <<<'EOQ'
-SELECT ?subject
-FROM <#ri>
-WHERE {
-  ?subject <fedora-model:hasModel> <info:fedora/islandora:collectionCModel>;
-           <fedora-rels-ext:isMemberOfCollection>+ <info:fedora/!pid>;
-           <fedora-model:state> <info:fedora/fedora-system:def/model#Active> .
-}
-ORDER BY ?subject
-EOQ;
-  $formatted_query = format_string($query, array(
-     '!pid' => $object->id,
-  ));
-  $results = $object->repository->ri->sparqlQuery($formatted_query, 'unlimited');
-  foreach ($results as $result) {
-    $collections[] = $result['subject']['value'];
-  }
+  $rc = get_child_collections($object->id, $collections);
+  sort($collections);
 
   $header = array();
   $header[] = array('data' => t('collection ID'));
@@ -455,16 +440,43 @@ EOQ;
   $header[] = array('data' => t('basic image'));
   $header[] = array('data' => t('binary'));
   $header[] = array('data' => t('book'));
+  $header[] = array('data' => t('book page'));
   $header[] = array('data' => t('citation'));
   $header[] = array('data' => t('compound'));
   $header[] = array('data' => t('large image'));
   $header[] = array('data' => t('newspaper'));
+  $header[] = array('data' => t('newspaper issue'));
+  $header[] = array('data' => t('newspaper page'));
   $header[] = array('data' => t('pdf'));
   $header[] = array('data' => t('serial'));
+  $header[] = array('data' => t('serial component'));
+  $header[] = array('data' => t('serial pdf'));
   $header[] = array('data' => t('thesis'));
   $header[] = array('data' => t('video'));
   $header[] = array('data' => t('total'));
   $rows = array();
+
+  $total_sum = 0;
+  $content_model_count = array(
+    'islandora:collectionCModel' => 0,
+    'islandora:sp-audioCModel' => 0,
+    'islandora:sp_basic_image' => 0,
+    'islandora:binaryObjectCModel' => 0,
+    'islandora:bookCModel' => 0,
+    'book page' => 0,
+    'ir:citationCModel' => 0,
+    'islandora:compoundCModel' => 0,
+    'islandora:sp_large_image_cmodel' => 0,
+    'islandora:newspaperCModel' => 0,
+    'newspaper issue' => 0,
+    'newspaper page' => 0,
+    'islandora:sp_pdf' => 0,
+    'islandora:rootSerialCModel' => 0,
+    'serial intermediate' => 0,
+    'serial pdf' => 0,
+    'ir:thesisCModel' => 0,
+    'islandora:sp_videoCModel' => 0,
+  );
 
   foreach ($collections as $collection) {
     $msg .= $collection;
@@ -476,6 +488,9 @@ EOQ;
       $filters = array();
       $filters[] = 'RELS_EXT_isMemberOfCollection_uri_ms:info\:fedora/' . str_replace(':','\:',$collection);
       $filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/' . str_replace(':','\:',$content_model);
+      if ($content_model == 'islandora:compoundCModel') {
+        $filters[] = '-RELS_EXT_isConstituentOf_uri_mt:*';
+      }
       if (strlen($datefilter) > 0) {
         $filters[] = $datefilter;
       }
@@ -491,15 +506,204 @@ EOQ;
       $count = $result_object['response']['numFound'];
       $msg .= ',' . $count;
       $row[] = array('data' => $count);
+      $content_model_count[$content_model] += $count;
       $total_count += $count;
+      $total_sum += $count;
+
+      // if book
+      if ($content_model == 'islandora:bookCModel') {
+        $params['fl'] = 'PID';
+        $book_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+
+        // loop through results
+        $page_count = 0;
+        foreach ($book_results['response']['docs'] as $doc) {
+          
+          // query for page counts for each book
+          $page_filters = array();
+          $page_filters[] = 'parent_book_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
+          $page_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:pageCModel';
+          $page_params = array(
+            'rows' => 0,
+            'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+            'fq' => $page_filters,
+          );
+          $page_results = json_decode($solr->search($solrquery, 0, 0, $page_params)->getRawResponse(), TRUE);
+          // keep a running total
+          $page_count += $page_results['response']['numFound'];
+        }
+        // display total
+        $msg .= ',' . $page_count;
+        $row[] = array('data' => $page_count);
+        $content_model_count['book page'] += $page_count;
+        $total_count += $page_count;
+        $total_sum += $page_count;
+      }
+
+      // if newspaper
+      if ($content_model == 'islandora:newspaperCModel') {
+        $params['fl'] = 'PID';
+        $newspaper_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+
+        // loop through results to get newspaper issue count
+        $newspaper_issue_count = 0;
+        foreach ($newspaper_results['response']['docs'] as $doc) {
+
+          // query for issue counts for each newspaper
+          $newspaper_issue_filters = array();
+          $newspaper_issue_filters[] = 'parent_newspaper_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
+          $newspaper_issue_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:newspaperIssueCModel';
+          $newspaper_issue_params = array(
+            'rows' => 0,
+            'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+            'fq' => $newspaper_issue_filters,
+          );
+          $newspaper_issue_results = json_decode($solr->search($solrquery, 0, 0, $newspaper_issue_params)->getRawResponse(), TRUE);
+          // keep a running total
+          $newspaper_issue_count += $newspaper_issue_results['response']['numFound'];
+        }
+        // display total
+        $msg .= ',' . $newspaper_issue_count;
+        $row[] = array('data' => $newspaper_issue_count);
+        $content_model_count['newspaper issue'] += $newspaper_issue_count;
+        $total_count += $newspaper_issue_count;
+        $total_sum += $newspaper_issue_count;
+
+        // loop through results to get newspaper page count
+        $newspaper_page_count = 0;
+        foreach ($newspaper_results['response']['docs'] as $doc) {
+
+          // query for page counts for each newspaper
+          $newspaper_page_filters = array();
+          $newspaper_page_filters[] = 'parent_newspaper_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
+          $newspaper_page_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:newspaperPageCModel';
+          $newspaper_page_params = array(
+            'rows' => 0,
+            'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+            'fq' => $newspaper_page_filters,
+          );
+          $newspaper_page_results = json_decode($solr->search($solrquery, 0, 0, $newspaper_page_params)->getRawResponse(), TRUE);
+          // keep a running total
+          $newspaper_page_count += $newspaper_page_results['response']['numFound'];
+        }
+        // display total
+        $msg .= ',' . $newspaper_page_count;
+        $row[] = array('data' => $newspaper_page_count);
+        $content_model_count['newspaper page'] += $newspaper_page_count;
+        $total_count += $newspaper_page_count;
+        $total_sum += $newspaper_page_count;
+      }
+
+      if ($content_model == 'islandora:rootSerialCModel') {
+        $params['fl'] = 'PID';
+        $serial_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+
+        // loop through results
+        $intermediate_count = 0;
+        foreach ($serial_results['response']['docs'] as $doc) {
+
+          // query for intermediate counts for each book
+          $intermediate_filters = array();
+          $intermediate_filters[] = 'parent_serial_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
+          $intermediate_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:intermediateCModel';
+          $intermediate_params = array(
+            'rows' => 0,
+            'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+            'fq' => $intermediate_filters,
+          );
+          $intermediate_results = json_decode($solr->search($solrquery, 0, 0, $intermediate_params)->getRawResponse(), TRUE);
+          // keep a running total
+          $intermediate_count += $intermediate_results['response']['numFound'];
+        }
+        // display total
+        $msg .= ',' . $intermediate_count;
+        $row[] = array('data' => $intermediate_count);
+        $content_model_count['serial intermediate'] += $intermediate_count;
+        $total_count += $intermediate_count;
+        $total_sum += $intermediate_count;
+        
+        // loop through results
+        $serial_pdf_count = 0;
+        foreach ($serial_results['response']['docs'] as $doc) {
+
+          // query for intermediate counts for each book
+          $serial_pdf_filters = array();
+          $serial_pdf_filters[] = 'parent_serial_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
+          $serial_pdf_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:sp_pdf';
+          $serial_pdf_params = array(
+            'rows' => 0,
+            'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+            'fq' => $serial_pdf_filters,
+          );
+          $serial_pdf_results = json_decode($solr->search($solrquery, 0, 0, $serial_pdf_params)->getRawResponse(), TRUE);
+          // keep a running total
+          $serial_pdf_count += $serial_pdf_results['response']['numFound'];
+        }
+        // display total
+        $msg .= ',' . $serial_pdf_count;
+        $row[] = array('data' => $serial_pdf_count);
+        $content_model_count['serial pdf'] += $serial_pdf_count;
+        $total_count += $serial_pdf_count;
+        $total_sum += $serial_pdf_count;
+      }
+
     }
     $msg .= "\n";
-    $row[] = $total_count;
+    //$row[] = $total_count;
+    $row[] = array('data' => $total_count);
     $rows[] = $row;
   }
 
+  $total_row = array();
+  $total_row[] = array('data' => "Content Model Counts");
+  $total_row[] = array('data' => $content_model_count['islandora:collectionCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:sp-audioCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:sp_basic_image']);
+  $total_row[] = array('data' => $content_model_count['islandora:binaryObjectCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:bookCModel']);
+  $total_row[] = array('data' => $content_model_count['book page']);
+  $total_row[] = array('data' => $content_model_count['ir:citationCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:compoundCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:sp_large_image_cmodel']);
+  $total_row[] = array('data' => $content_model_count['islandora:newspaperCModel']);
+  $total_row[] = array('data' => $content_model_count['newspaper issue']);
+  $total_row[] = array('data' => $content_model_count['newspaper page']);
+  $total_row[] = array('data' => $content_model_count['islandora:sp_pdf']);
+  $total_row[] = array('data' => $content_model_count['islandora:rootSerialCModel']);
+  $total_row[] = array('data' => $content_model_count['serial intermediate']);
+  $total_row[] = array('data' => $content_model_count['serial pdf']);
+  $total_row[] = array('data' => $content_model_count['ir:thesisCModel']);
+  $total_row[] = array('data' => $content_model_count['islandora:sp_videoCModel']);
+  $total_row[] = array('data' => $total_sum);
+
+  $rows[] = $total_row;
+
   $output = theme('table', array('header' => $header, 'rows' => $rows));
   return $output;
+}
+
+function get_child_collections($collection_pid, &$collections) {
+    $results_count = 0;
+    $fedora_object = islandora_object_load(variable_get('islandora_repository_pid', 'islandora:root'));
+    $query = <<<'EOQ'
+SELECT ?subject
+FROM <#ri>
+WHERE {
+  ?subject <fedora-model:hasModel> <info:fedora/islandora:collectionCModel>;
+           <fedora-rels-ext:isMemberOfCollection> <info:fedora/!pid>;
+           <fedora-model:state> <info:fedora/fedora-system:def/model#Active> .
+}
+EOQ;
+    $formatted_query = format_string($query, array(
+      '!pid' => $collection_pid,
+    ));
+    $results = $fedora_object->repository->ri->sparqlQuery($formatted_query, 'unlimited');
+    $results_count = count($results);
+    foreach ($results as $result) {
+      $collections[] = $result['subject']['value'];
+      $rc = get_child_collections($result['subject']['value'], $collections);
+    }
+    return $results_count;
 }
 
 function flvc_form_alter(&$form, $form_state, $form_id) {
