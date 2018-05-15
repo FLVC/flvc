@@ -355,9 +355,20 @@ function flvc_report_form(array $form, array &$form_state, AbstractObject $objec
 
   $form['show_br_3'] = array(
       '#type' => 'markup',
-      '#markup' => '<br><br>',
+      '#markup' => '<br>',
   );
 
+  $form['download_csv_file'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Download a csv file'),
+    '#description' => t('Download a csv file.'),
+    '#default_value' => FALSE,
+  );
+
+  $form['show_br_4'] = array(
+      '#type' => 'markup',
+      '#markup' => '<br>',
+  );
 
   $form['submit'] = array(
     '#type' => 'submit',
@@ -373,6 +384,7 @@ function flvc_report_form_submit($form, &$form_state) {
   $createdate2 = $form_state['values']['createdate2'];
   $solrfield = $form_state['values']['solrfield'];
   $solrsearch = $form_state['values']['solrsearch'];
+  $downloadcsv = $form_state['values']['download_csv_file'];
   $params = array();
   if (strlen($createdate1) > 0) {
     $params = array_merge($params, array('cdate1' => $createdate1));
@@ -383,11 +395,15 @@ function flvc_report_form_submit($form, &$form_state) {
   if ((strlen($solrfield) > 0)&&(strlen($solrsearch) > 0)) {
     $params = array_merge($params, array('solrfield' => str_replace('.','_',$solrfield) . '_mt', 'solrsearch' => $solrsearch));
   }
+  if ($downloadcsv) {
+    $params = array_merge($params, array('csv' => 'true'));
+  }
   $form_state['redirect'] = array('islandora/object/' . $object->id . '/report/results', array('query' => $params));
 }
 
 function flvc_report_results(FedoraObject $object) {
 
+  $downloadcsv = isset($_GET['csv']) ? true : false;
   $createdate1 = isset($_GET['cdate1']) ? $_GET['cdate1'] : '';
   $createdate2 = isset($_GET['cdate2']) ? $_GET['cdate2'] : '';
   $datefilter = '';
@@ -453,8 +469,31 @@ function flvc_report_results(FedoraObject $object) {
   $header[] = array('data' => t('serial pdf'));
   $header[] = array('data' => t('thesis'));
   $header[] = array('data' => t('video'));
-  $header[] = array('data' => t('total'));
+  $header[] = array('data' => t('total per collection'));
   $rows = array();
+  $csv_rows = array();
+  $csv_row = array();
+  $csv_header[] = 'collection ID';
+  $csv_header[] = 'collection';
+  $csv_header[] = 'audio';
+  $csv_header[] = 'basic image';
+  $csv_header[] = 'binary';
+  $csv_header[] = 'book';
+  $csv_header[] = 'book page';
+  $csv_header[] = 'citation';
+  $csv_header[] = 'compound';
+  $csv_header[] = 'large image';
+  $csv_header[] = 'newspaper';
+  $csv_header[] = 'newspaper issue';
+  $csv_header[] = 'newspaper page';
+  $csv_header[] = 'pdf';
+  $csv_header[] = 'serial';
+  $csv_header[] = 'serial component';
+  $csv_header[] = 'serial pdf';
+  $csv_header[] = 'thesis';
+  $csv_header[] = 'video';
+  $csv_header[] = 'total per collection';
+  $csv_rows[] = $csv_header;
 
   $total_sum = 0;
   $content_model_count = array(
@@ -482,7 +521,9 @@ function flvc_report_results(FedoraObject $object) {
     $msg .= $collection;
     $total_count = 0;
     $row = array();
+    $csv_row = array();
     $row[] = array('data' => $collection);
+    $csv_row[] = $collection;
 
     foreach ($content_models as $content_model) {
       $filters = array();
@@ -506,9 +547,9 @@ function flvc_report_results(FedoraObject $object) {
       $count = $result_object['response']['numFound'];
       $msg .= ',' . $count;
       $row[] = array('data' => $count);
+      $csv_row[] = $count;
       $content_model_count[$content_model] += $count;
       $total_count += $count;
-      $total_sum += $count;
 
       // if book
       if ($content_model == 'islandora:bookCModel') {
@@ -535,9 +576,9 @@ function flvc_report_results(FedoraObject $object) {
         // display total
         $msg .= ',' . $page_count;
         $row[] = array('data' => $page_count);
+        $csv_row[] = $page_count;
         $content_model_count['book page'] += $page_count;
         $total_count += $page_count;
-        $total_sum += $page_count;
       }
 
       // if newspaper
@@ -565,9 +606,9 @@ function flvc_report_results(FedoraObject $object) {
         // display total
         $msg .= ',' . $newspaper_issue_count;
         $row[] = array('data' => $newspaper_issue_count);
+        $csv_row[] = $newspaper_issue_count;
         $content_model_count['newspaper issue'] += $newspaper_issue_count;
         $total_count += $newspaper_issue_count;
-        $total_sum += $newspaper_issue_count;
 
         // loop through results to get newspaper page count
         $newspaper_page_count = 0;
@@ -589,9 +630,9 @@ function flvc_report_results(FedoraObject $object) {
         // display total
         $msg .= ',' . $newspaper_page_count;
         $row[] = array('data' => $newspaper_page_count);
+        $csv_row[] = $newspaper_page_count;
         $content_model_count['newspaper page'] += $newspaper_page_count;
         $total_count += $newspaper_page_count;
-        $total_sum += $newspaper_page_count;
       }
 
       if ($content_model == 'islandora:rootSerialCModel') {
@@ -618,9 +659,9 @@ function flvc_report_results(FedoraObject $object) {
         // display total
         $msg .= ',' . $intermediate_count;
         $row[] = array('data' => $intermediate_count);
+        $csv_row[] = $intermediate_count;
         $content_model_count['serial intermediate'] += $intermediate_count;
         $total_count += $intermediate_count;
-        $total_sum += $intermediate_count;
         
         // loop through results
         $serial_pdf_count = 0;
@@ -642,20 +683,23 @@ function flvc_report_results(FedoraObject $object) {
         // display total
         $msg .= ',' . $serial_pdf_count;
         $row[] = array('data' => $serial_pdf_count);
+        $csv_row[] = $serial_pdf_count;
         $content_model_count['serial pdf'] += $serial_pdf_count;
         $total_count += $serial_pdf_count;
-        $total_sum += $serial_pdf_count;
       }
 
     }
     $msg .= "\n";
     //$row[] = $total_count;
+    $total_sum += $total_count;
     $row[] = array('data' => $total_count);
     $rows[] = $row;
+    $csv_row[] = $total_count;
+    $csv_rows[] = $csv_row;
   }
 
   $total_row = array();
-  $total_row[] = array('data' => "Content Model Counts");
+  $total_row[] = array('data' => "total per content model");
   $total_row[] = array('data' => $content_model_count['islandora:collectionCModel']);
   $total_row[] = array('data' => $content_model_count['islandora:sp-audioCModel']);
   $total_row[] = array('data' => $content_model_count['islandora:sp_basic_image']);
@@ -678,6 +722,32 @@ function flvc_report_results(FedoraObject $object) {
 
   $rows[] = $total_row;
 
+  $csv_total_row = array();
+  $csv_total_row[] = 'total per content model';
+  $csv_total_row[] = $content_model_count['islandora:collectionCModel'];
+  $csv_total_row[] = $content_model_count['islandora:sp-audioCModel'];
+  $csv_total_row[] = $content_model_count['islandora:sp_basic_image'];
+  $csv_total_row[] = $content_model_count['islandora:binaryObjectCModel'];
+  $csv_total_row[] = $content_model_count['islandora:bookCModel'];
+  $csv_total_row[] = $content_model_count['book page'];
+  $csv_total_row[] = $content_model_count['ir:citationCModel'];
+  $csv_total_row[] = $content_model_count['islandora:compoundCModel'];
+  $csv_total_row[] = $content_model_count['islandora:sp_large_image_cmodel'];
+  $csv_total_row[] = $content_model_count['islandora:newspaperCModel'];
+  $csv_total_row[] = $content_model_count['newspaper issue'];
+  $csv_total_row[] = $content_model_count['newspaper page'];
+  $csv_total_row[] = $content_model_count['islandora:sp_pdf'];
+  $csv_total_row[] = $content_model_count['islandora:rootSerialCModel'];
+  $csv_total_row[] = $content_model_count['serial intermediate'];
+  $csv_total_row[] = $content_model_count['serial pdf'];
+  $csv_total_row[] = $content_model_count['ir:thesisCModel'];
+  $csv_total_row[] = $content_model_count['islandora:sp_videoCModel'];
+  $csv_total_row[] = $total_sum;
+  $csv_rows[] = $csv_total_row;
+
+  if ($downloadcsv) {
+    flvc_download_csv($csv_rows);
+  }
   $output = theme('table', array('header' => $header, 'rows' => $rows));
   return $output;
 }
@@ -704,6 +774,27 @@ EOQ;
       $rc = get_child_collections($result['subject']['value'], $collections);
     }
     return $results_count;
+}
+
+function flvc_download_csv($rows) {
+  global $user;
+  $export_uri = 'public://csv_report_' . time() . '.csv';
+  // We register this file into Drupal so it will be deleted.
+  $file = new stdClass();
+  $file->fid = NULL;
+  $file->uri = $export_uri;
+  $file->filename = drupal_basename($export_uri);
+  $file->filemime = file_get_mimetype($file->uri);
+  $file->uid = $user->uid;
+  $fp = fopen($export_uri, 'w');
+  foreach ($rows as $row) {
+    fputcsv($fp, $row);
+  }
+
+  fclose($fp);
+  drupal_set_message(filter_xss(t('The exported CSV report is available for download !url.', array(
+    '!url' => l(t('here'), file_create_url($export_uri)),
+  ))));
 }
 
 function flvc_form_alter(&$form, $form_state, $form_id) {
