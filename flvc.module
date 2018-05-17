@@ -303,7 +303,7 @@ function flvc_report_form(array $form, array &$form_state, AbstractObject $objec
 
   $form['report_desc'] = array(
       '#type' => 'markup',
-      '#markup' => '<h3>' . $object->label . '</h3>Report of object counts for this collection and any child collections, grouped by content model.  Note - counts objects directly under each collection.  Counts do not currently include children of book, newspaper, or serial objects (issue, page, and serial pdf objects).<br><br>',
+      '#markup' => '<h3>' . $object->label . '</h3>Report of object counts for this collection and any child collections, grouped by content model.  Select the checkbox to download a CSV file of the report.<br><br>',
   );
 
   $form['show_br'] = array(
@@ -361,7 +361,7 @@ function flvc_report_form(array $form, array &$form_state, AbstractObject $objec
   $form['download_csv_file'] = array(
     '#type' => 'checkbox',
     '#title' => t('Download a csv file'),
-    '#description' => t('Download a csv file.'),
+    '#description' => t('Download a CSV file.'),
     '#default_value' => FALSE,
   );
 
