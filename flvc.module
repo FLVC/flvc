@@ -532,6 +532,14 @@ function flvc_report_results(FedoraObject $object) {
       if ($content_model == 'islandora:compoundCModel') {
         $filters[] = '-RELS_EXT_isConstituentOf_uri_mt:*';
       }
+
+      // make sure we can query with no date filter for retrieving parent objects for child object counts
+      $params_no_date = array(
+        'rows' => 0,
+        'qt' => variable_get('islandora_solr_request_handler', 'standard'),
+        'fq' => $filters,
+      );
+
       if (strlen($datefilter) > 0) {
         $filters[] = $datefilter;
       }
@@ -553,8 +561,10 @@ function flvc_report_results(FedoraObject $object) {
 
       // if book
       if ($content_model == 'islandora:bookCModel') {
-        $params['fl'] = 'PID';
-        $book_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+        $book_results = json_decode($solr->search($solrquery, 0, 0, $params_no_date)->getRawResponse(), TRUE);
+        $book_count_no_date = $book_results['response']['numFound'];
+        $params_no_date['fl'] = 'PID';
+        $book_results = json_decode($solr->search($solrquery, 0, $book_count_no_date, $params_no_date)->getRawResponse(), TRUE);
 
         // loop through results
         $page_count = 0;
@@ -564,6 +574,9 @@ function flvc_report_results(FedoraObject $object) {
           $page_filters = array();
           $page_filters[] = 'parent_book_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
           $page_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:pageCModel';
+          if (strlen($datefilter) > 0) {
+            $page_filters[] = $datefilter;
+          }
           $page_params = array(
             'rows' => 0,
             'qt' => variable_get('islandora_solr_request_handler', 'standard'),
@@ -583,8 +596,10 @@ function flvc_report_results(FedoraObject $object) {
 
       // if newspaper
       if ($content_model == 'islandora:newspaperCModel') {
-        $params['fl'] = 'PID';
-        $newspaper_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+        $newspaper_results = json_decode($solr->search($solrquery, 0, 0, $params_no_date)->getRawResponse(), TRUE);
+        $newspaper_count_no_date = $newspaper_results['response']['numFound'];
+        $params_no_date['fl'] = 'PID';
+        $newspaper_results = json_decode($solr->search($solrquery, 0, $newspaper_count_no_date, $params_no_date)->getRawResponse(), TRUE);
 
         // loop through results to get newspaper issue count
         $newspaper_issue_count = 0;
@@ -594,6 +609,9 @@ function flvc_report_results(FedoraObject $object) {
           $newspaper_issue_filters = array();
           $newspaper_issue_filters[] = 'parent_newspaper_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
           $newspaper_issue_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:newspaperIssueCModel';
+          if (strlen($datefilter) > 0) {
+            $newspaper_issue_filters[] = $datefilter;
+          }
           $newspaper_issue_params = array(
             'rows' => 0,
             'qt' => variable_get('islandora_solr_request_handler', 'standard'),
@@ -618,6 +636,9 @@ function flvc_report_results(FedoraObject $object) {
           $newspaper_page_filters = array();
           $newspaper_page_filters[] = 'parent_newspaper_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
           $newspaper_page_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:newspaperPageCModel';
+          if (strlen($datefilter) > 0) {
+            $newspaper_page_filters[] = $datefilter;
+          }
           $newspaper_page_params = array(
             'rows' => 0,
             'qt' => variable_get('islandora_solr_request_handler', 'standard'),
@@ -636,8 +657,10 @@ function flvc_report_results(FedoraObject $object) {
       }
 
       if ($content_model == 'islandora:rootSerialCModel') {
-        $params['fl'] = 'PID';
-        $serial_results = json_decode($solr->search($solrquery, 0, $count, $params)->getRawResponse(), TRUE);
+        $serial_results = json_decode($solr->search($solrquery, 0, 0, $params_no_date)->getRawResponse(), TRUE);
+        $serial_count_no_date = $serial_results['response']['numFound'];
+        $params_no_date['fl'] = 'PID';
+        $serial_results = json_decode($solr->search($solrquery, 0, $serial_count_no_date, $params_no_date)->getRawResponse(), TRUE);
 
         // loop through results
         $intermediate_count = 0;
@@ -647,6 +670,9 @@ function flvc_report_results(FedoraObject $object) {
           $intermediate_filters = array();
           $intermediate_filters[] = 'parent_serial_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
           $intermediate_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:intermediateCModel';
+          if (strlen($datefilter) > 0) {
+            $intermediate_filters[] = $datefilter;
+          }
           $intermediate_params = array(
             'rows' => 0,
             'qt' => variable_get('islandora_solr_request_handler', 'standard'),
@@ -671,6 +697,9 @@ function flvc_report_results(FedoraObject $object) {
           $serial_pdf_filters = array();
           $serial_pdf_filters[] = 'parent_serial_id_ms:info\:fedora/' . str_replace(':','\:',$doc['PID']);
           $serial_pdf_filters[] = 'RELS_EXT_hasModel_uri_ms:info\:fedora/islandora\:sp_pdf';
+          if (strlen($datefilter) > 0) {
+            $serial_pdf_filters[] = $datefilter;
+          }
           $serial_pdf_params = array(
             'rows' => 0,
             'qt' => variable_get('islandora_solr_request_handler', 'standard'),
