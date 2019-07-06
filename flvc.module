@@ -850,6 +850,8 @@ function iid_validate_ingest($form, &$form_state) {
   $errmsg = 'The following IID identifiers already exist: ';
   $error_IID_numbers = '';
   $error_IID_badchars = '';
+  $error_IID_bsh = '';
+
 
   // do not validate if no flvc extension with owning institution
   if (!isset($form['extension']['flvc']['owningInst']['#value'])) {
@@ -870,6 +872,10 @@ function iid_validate_ingest($form, &$form_state) {
 
       if (preg_match("/[^A-Za-z0-9_\-()\.]/", $form['id'][$i]['identifier']['#value'])) {
         $error_IID_badchars .= $form['id'][$i]['identifier']['#value'] . ' ';
+      }
+
+      if (strpos($form['id'][$i]['identifier']['#value'], "bsh") !== false) {
+        $error_IID_bsh .= $form['id'][$i]['identifier']['#value'] . ' ';
       }
 
       $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
@@ -893,6 +899,10 @@ function iid_validate_ingest($form, &$form_state) {
 
   if (strlen($error_IID_badchars) > 0) {
     form_set_error('', t('The following IID identifiers have illegal characters (characters can be alphanumeric, underscore, hyphen, period, or parentheses with no spaces): %iidnums', array('%iidnums' => $error_IID_badchars)));
+  }
+
+  if (strlen($error_IID_bsh) > 0) {
+    form_set_error('', t('The following IID identifiers contain the illegal character string "bsh" (please uppercase or replace with other characters): %iidnums', array('%iidnums' => $error_IID_bsh)));
   }
 
   if (strlen($error_IID_numbers) > 0) {
@@ -961,6 +971,7 @@ function iid_validate_edit($form, &$form_state) {
 
   $error_IID_numbers = '';
   $error_IID_badchars = '';
+  $error_IID_bsh = '';
 
   // do not validate if no flvc extension with owning institution
   if (!isset($form['extension']['flvc']['owningInst']['#value'])) {
@@ -989,6 +1000,10 @@ function iid_validate_edit($form, &$form_state) {
 
       if (preg_match("/[^A-Za-z0-9_\-()\.]/", $form['id'][$i]['identifier']['#value'])) {
         $error_IID_badchars .= $form['id'][$i]['identifier']['#value'] . ' ';
+      }
+
+      if (strpos($form['id'][$i]['identifier']['#value'], "bsh") !== false) {
+        $error_IID_bsh .= $form['id'][$i]['identifier']['#value'] . ' ';
       }
 
       $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
@@ -1021,6 +1036,10 @@ function iid_validate_edit($form, &$form_state) {
 
   if (strlen($error_IID_numbers) > 0) {
     form_set_error('', t('The following IID identifiers already exist in other objects: %iidnums', array('%iidnums' => $error_IID_numbers)));
+  }
+
+  if (strlen($error_IID_bsh) > 0) {
+    form_set_error('', t('The following IID identifiers contain the illegal character string "bsh" (please uppercase or replace with other characters): %iidnums', array('%iidnums' => $error_IID_bsh)));
   }
 
   // other identifiers of type=IID are not allowed
@@ -1580,10 +1599,39 @@ EOQ;
  * Implements hook_islandora_object_alter().
  */
 function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
+
   // Set state to 'D' instead of deleting object 
   if ($context['action'] == 'purge') {
     $context['delete'] = TRUE;
   }
+
+  // if state change to active, block if IID exists
+  if ($context['action'] == 'modify') {
+    if ((isset($context['params']['state']))&&($context['params']['state'] == 'A')&&(isset($object['MODS']))) {
+      $mods_str = $object['MODS']->content;
+      $mods_xml = new SimpleXMLElement($mods_str);
+
+      // check for IID identifier
+      if (isset($mods_xml->identifier)) {
+        foreach ($mods_xml->identifier as $identifier) {
+          if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
+            $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($identifier)));
+            $results = file_get_contents($solr_url);
+            $solr_results = array();
+            if (isset($results)) {
+              $solr_results = json_decode($results, TRUE);
+              $numfound = $solr_results['response']['numFound'];          
+              if ($numfound > 0) {              
+                drupal_set_message(t('The IID identifier %iidnum already exists. A unique IID identifier is required before changing the state to Active.', array('%iidnum' => $identifier)), $type = 'error');
+                $context['block'] = TRUE;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
 }
 
 function flvc_islandora_solr_query($islandora_solr_query) {
