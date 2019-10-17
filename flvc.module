@@ -1743,7 +1743,7 @@ function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
             foreach ($object_results as $object_index => $object_result)
             {
               if ($object->id != $object_result['PID']) {
-                $error_IID_numbers = $error_IID_numbers . $form['id'][$i]['identifier']['#value'] . ' ';
+                $error_IID_numbers = $error_IID_numbers . trim($identifier) . ' ';
               }
             }
           }
