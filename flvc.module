@@ -1601,9 +1601,9 @@ EOQ;
 function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
 
   // Set state to 'D' instead of deleting object 
-  //if ($context['action'] == 'purge') {
-  //  $context['delete'] = TRUE;
-  //}
+  if ($context['action'] == 'purge') {
+    $context['delete'] = TRUE;
+  }
 
   // if state change to active, block if IID exists
   if ($context['action'] == 'modify') {
