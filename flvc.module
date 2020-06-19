@@ -1101,7 +1101,6 @@ function iid_validate_edit($form, &$form_state) {
   if (strlen($error_purls) > 0) {
     form_set_error('', t('Allowable PURL domains are %domains.  The following PURLs have incorrect formats: %badpurls', array('%domains' => $domains, '%badpurls' => $error_purls)));
   }
-
 }
 
 function escapeSolrValue($string)
@@ -1564,7 +1563,6 @@ EOQ;
     if ($count == 0) {
       return;
     }
-
   }
 
   // determine number of child collection objects
@@ -1631,7 +1629,6 @@ function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
       }
     }
   }
-
 }
 
 function flvc_islandora_solr_query($islandora_solr_query) {
@@ -1665,7 +1662,6 @@ function flvc_islandora_datastream_alter(AbstractObject $object, AbstractDatastr
       drupal_set_message('found dsFile for create');
     }
   }
-
 }
 
 function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
@@ -1781,9 +1777,9 @@ function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
     if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
       $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
       $hoststr = '/' . $owning_institution . '/';
-      if (stripos($purl_id,$hoststr) !== 0) {
-        $error_purls = $error_purls . $url . ' ';
-      }
+      if ((stripos($purl_id,$hoststr) !== 0)&&(stripos($purl_id,'/flvc/') !== 0)&&(stripos($purl_id,'/fcla/') !== 0)) {
+         $error_purls = $error_purls . $url . ' ';
+       }
     }
   }
   if (strlen($server_error_purls) > 0) {
