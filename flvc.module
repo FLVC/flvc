@@ -944,11 +944,11 @@ function iid_validate_ingest($form, &$form_state) {
     {
       $purl_count += 1;
       $url = trim($form['location'][$i]['URL']['#value']);
-      if ((strpos($url,'http://purl.flvc.org') === false)&&(strpos($url,'http://purl.fcla.edu') === false)) {
+      if (valid_purl_server_name($url) === false) {
           $server_error_purls = $server_error_purls . $url . ' ';
       }
       else {
-          $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
+          $purl_id = get_purl_from_url($url);
           $hoststr = '/' . $form['extension']['flvc']['owningInst']['#value'] . '/';
           if (stripos($purl_id,$hoststr) !== 0) {
               $error_purls = $error_purls . $url . ' ';
@@ -1077,11 +1077,11 @@ function iid_validate_edit($form, &$form_state) {
     {
       $purl_count += 1;
       $url = trim($form['location'][$i]['URL']['#value']);
-      if ((strpos($url,'http://purl.flvc.org') === false)&&(strpos($url,'http://purl.fcla.edu') === false)) {
+      if (valid_purl_server_name($url) === false) {
           $server_error_purls = $server_error_purls . $url . ' ';
       }
       else {
-          $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
+          $purl_id = get_purl_from_url($url);
           $hoststr = '/' . $form['extension']['flvc']['owningInst']['#value'] . '/';
           if ((stripos($purl_id,$hoststr) !== 0)&&(stripos($purl_id,'/flvc/') !== 0)&&(stripos($purl_id,'/fcla/') !== 0)) {
               $error_purls = $error_purls . $url . ' ';
@@ -1113,6 +1113,8 @@ function escapeSolrValue($string)
 }
 
 function flvc_islandora_object_ingested(AbstractObject $object) {
+
+    module_load_include('inc', 'flvc', 'includes/purl-functions');
 
     if (!isset($object['MODS']))
         return;
@@ -1156,19 +1158,28 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
     if ($iid_count == 0)
         return;
 
+    $purl_api_enabled = variable_get('flvc_purl_enabled', FALSE);
+
     // check for PURL
     foreach ($mods_xml->location as $location) {
         $url = $location->url;
-        if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
+        if (valid_purl_server_name($url) !== false) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
-            $purl_id = str_replace('http://purl.flvc.org','',$purl);
-            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+            $purl_id = get_purl_from_url($url);
+
+            if ($purl_api_enabled) {
+              purl_process($purl_id, $owning_institution, $object->id);
+            }
+            else {
+              drupal_set_message('No PURL created');
+            //$command = '/usr/local/islandora/flvc_purl_scripts/php/load-purl-pid --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
             //drupal_set_message(t($command));
-            $execout = array();
-            exec($command, $execout);
-            foreach ($execout as $msg) {
-                if (strpos($msg,'PURLERROR') !== false)
-                    drupal_set_message($msg);
+            //$execout = array();
+            //exec($command, $execout);
+            //foreach ($execout as $msg) {
+            //    if (strpos($msg,'PURLERROR') !== false)
+            //        drupal_set_message($msg);
+            //}
             }
         }
     }
@@ -1177,6 +1188,8 @@ function flvc_islandora_object_ingested(AbstractObject $object) {
 }
 
 function flvc_islandora_datastream_modified(AbstractObject $object, AbstractDatastream $datastream) {
+
+    module_load_include('inc', 'flvc', 'includes/purl-functions');
 
     if ($datastream->id != 'MODS')
         return;
@@ -1223,19 +1236,30 @@ function flvc_islandora_datastream_modified(AbstractObject $object, AbstractData
     if ($iid_count == 0)
         return;
 
+    $valid_purl_server_names = explode(",", variable_get('flvc_purl_valid_server_names', 'purl.flvc.org,purl.fcla.edu'));
+
+    $purl_api_enabled = variable_get('flvc_purl_enabled', FALSE);
+
     // check for PURL
     foreach ($mods_xml->location as $location) {
         $url = $location->url;
-        if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
+        if (valid_purl_server_name($url) !== false) {
             $purl = str_replace('http://purl.fcla.edu','',$url);
-            $purl_id = str_replace('http://purl.flvc.org','',$purl);
-            $command = '/usr/local/islandora/flvc_purl_scripts/prospective/load-prospective --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
+            $purl_id = get_purl_from_url($url);
+
+            if ($purl_api_enabled) {
+              purl_process($purl_id, $owning_institution, $object->id);
+            }
+            else {
+              drupal_set_message('No PURL created');
+            //$command = '/usr/local/islandora/flvc_purl_scripts/php/load-purl-pid --purl ' . escapeshellarg($purl_id) . ' --own ' . $owning_institution . ' --pid ' . $object->id;
             //drupal_set_message(t($command));
-            $execout = array();
-            exec($command, $execout);
-            foreach ($execout as $msg) {
-                if (strpos($msg,'PURLERROR') !== false)
-                    drupal_set_message($msg);
+            //$execout = array();
+            //exec($command, $execout);
+            //foreach ($execout as $msg) {
+            //    if (strpos($msg,'PURLERROR') !== false)
+            //        drupal_set_message($msg);
+            //}
             }
         }
     }
@@ -1770,12 +1794,12 @@ function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
   foreach ($mods_xml->location as $location) {
     $url = $location->url;
     if (isset($location['displayLabel'])&&(strcasecmp($location['displayLabel'], 'purl') == 0)) {
-      if ((strpos($url,'http://purl.flvc.org') === false)&&(strpos($url,'http://purl.fcla.edu') === false)) {
+      if (valid_purl_server_name($url) === false) {
         $server_error_purls = $server_error_purls . $url . ' ';
       }
     }
-    if ((strpos($url,'http://purl.flvc.org') !== false)||(strpos($url,'http://purl.fcla.edu') !== false)) {
-      $purl_id = str_replace('http://purl.flvc.org','',str_replace('http://purl.fcla.edu','',$url));
+    if (valid_purl_server_name($url) !== false) {
+      $purl_id = get_purl_from_url($url);
       $hoststr = '/' . $owning_institution . '/';
       if ((stripos($purl_id,$hoststr) !== 0)&&(stripos($purl_id,'/flvc/') !== 0)&&(stripos($purl_id,'/fcla/') !== 0)) {
          $error_purls = $error_purls . $url . ' ';
@@ -1790,4 +1814,27 @@ function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
   }
 
   return '';
+}
+
+function valid_purl_server_name($url) {
+
+  $purl_valid_server_names = explode(",", variable_get('flvc_purl_valid_server_names', 'purl.flvc.org,purl.fcla.edu'));
+
+  foreach($purl_valid_server_names as $purl_server_name) {
+    if (strpos($url,$purl_server_name) !== false) return true;
+  }
+  return false;
+}
+
+function get_purl_from_url($url) {
+  $purl_valid_server_names = explode(",", variable_get('flvc_purl_valid_server_names', 'purl.flvc.org,purl.fcla.edu'));
+
+  $purl = $url;
+  $purl = str_replace('http://','',$purl);
+  $purl = str_replace('https://','',$purl);
+
+  foreach($purl_valid_server_names as $purl_server_name) {
+    $purl = str_replace($purl_server_name,'',$purl);
+  }
+  return $purl;
 }
