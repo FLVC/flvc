@@ -14,6 +14,20 @@
  *   The Drupal form definition.
  */
 function flvc_admin_form() {
+
+  $matches = array();
+  preg_match('/^([^\.]*)/', $_SERVER['SERVER_NAME'], $matches);
+  $default_purl_valid_server_names = 'purl.flvc.org,purl.fcla.edu';
+  $default_purl_server = 'https://purl.flvc.org';
+  if (strpos($matches[0],'-dev')) {
+    $default_purl_valid_server_names .= ',purl.dev.flvc.org';
+    $default_purl_server = 'https://purl.dev.flvc.org';
+  }
+  if (strpos($matches[0],'-test')) {
+    $default_purl_valid_server_names .= ',purl.test.flvc.org';
+    $default_purl_server = 'https://purl.test.flvc.org';
+  }
+
   $form = array();
 
   $form['flvc_include_collections_in_search'] = array(
@@ -34,7 +48,7 @@ function flvc_admin_form() {
         '#type' => 'textfield',
         '#title' => t('Valid PURL server names'),
         '#description' => t('Enter valid PURL server names, including legacy (separated by commas).'),
-        '#default_value' => variable_get('flvc_purl_valid_server_names', 'purl.flvc.org,purl.fcla.edu'),
+        '#default_value' => variable_get('flvc_purl_valid_server_names', $default_purl_valid_server_names),
     );
 
     $form['flvc_purl'] = array(
@@ -49,7 +63,7 @@ function flvc_admin_form() {
         '#type' => 'textfield',
         '#title' => t('PURL server'),
         '#description' => t('Enter location of the PURL server.'),
-        '#default_value' => variable_get('flvc_purl_server', 'https://'),
+        '#default_value' => variable_get('flvc_purl_server', $default_purl_server),
         '#states' => array(
           'invisible' => array(
             ':input[name="flvc_purl_enabled"]' => array('checked' => FALSE),
@@ -71,7 +85,7 @@ function flvc_admin_form() {
         '#type' => 'textfield',
         '#title' => t('PURL target site name'),
         '#description' => t('Enter the target site name.'),
-        '#default_value' => variable_get('flvc_purl_target_hostname', 'https://site.digital.flvc.org'),
+        '#default_value' => variable_get('flvc_purl_target_hostname', 'https://' . $_SERVER['SERVER_NAME']),
         '#states' => array(
           'invisible' => array(
             ':input[name="flvc_purl_enabled"]' => array('checked' => FALSE),
