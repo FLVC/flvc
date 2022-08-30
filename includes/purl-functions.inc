@@ -1,5 +1,3 @@
-#!/opt/rh/rh-php56/root/usr/bin/php
-
 <?php
 
 function purl_process($purl, $owning_inst ,$pid) {
