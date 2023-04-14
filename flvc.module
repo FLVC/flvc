@@ -878,7 +878,8 @@ function iid_validate_ingest($form, &$form_state) {
         $error_IID_bsh .= $form['id'][$i]['identifier']['#value'] . ' ';
       }
 
-      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
+      $solr_host = variable_get('islandora_solr_url', 'localhost:8080/solr');
+      $solr_url = "http://" . $solr_host . "/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
 
       $results = file_get_contents($solr_url);
       $solr_results = array();
@@ -1006,7 +1007,8 @@ function iid_validate_edit($form, &$form_state) {
         $error_IID_bsh .= $form['id'][$i]['identifier']['#value'] . ' ';
       }
 
-      $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
+      $solr_host = variable_get('islandora_solr_url', 'localhost:8080/solr');
+      $solr_url = "http://" . $solr_host . "/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($form['id'][$i]['identifier']['#value'])));
 
       $results = file_get_contents($solr_url);
       $solr_results = array();
@@ -1637,7 +1639,8 @@ function flvc_islandora_object_alter(AbstractObject $object, array &$context) {
       if (isset($mods_xml->identifier)) {
         foreach ($mods_xml->identifier as $identifier) {
           if (isset($identifier['type'])&&(strcasecmp($identifier['type'], 'IID') == 0)&&(strlen(trim($identifier)) > 0)) {
-            $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($identifier)));
+            $solr_host = variable_get('islandora_solr_url', 'localhost:8080/solr');
+            $solr_url = "http://" . $solr_host . "/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($identifier)));
             $results = file_get_contents($solr_url);
             $solr_results = array();
             if (isset($results)) {
@@ -1752,7 +1755,8 @@ function flvc_validate_MODS(AbstractObject $object, $xmlstring) {
           $error_IID_bsh .= trim($identifier) . ' ';
         }
 
-        $solr_url = "http://localhost:8080/solr/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($identifier)));
+        $solr_host = variable_get('islandora_solr_url', 'localhost:8080/solr');
+        $solr_url = "http://" . $solr_host . "/select/?version=2.2&start=0&rows=10&indent=on&fl=PID&wt=json&q=mods_identifier_iid_mls%3A" . urlencode(escapeSolrValue(trim($identifier)));
         $results = file_get_contents($solr_url);
         $solr_results = array();
         if (isset($results)) {
