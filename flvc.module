@@ -1842,3 +1842,9 @@ function get_purl_from_url($url) {
   }
   return $purl;
 }
+
+function flvc_views_pre_build(&$view) {
+  if ($view->name == 'usage_collection') {
+    $view->items_per_page = 100;
+  }
+}
