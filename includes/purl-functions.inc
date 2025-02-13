@@ -28,6 +28,12 @@ function purl_process($purl, $owning_inst ,$pid) {
 
   $outstream =  fopen("php://stderr", "a");
 
+  $php_version = phpversion();
+  if ($php_version == "5.3.3") {
+    fwrite($outstream, "Unsupported PHP version 5.3.3 - no PURL processed\n");
+    return;
+  }
+
   if ($mode == "create") {
     $purl_id = purl_get($purl_server, $purl_api_key, $purl, $outstream);
     if ($purl_id == "0") {
@@ -58,7 +64,11 @@ function build_header($purl_api_key) {
         'Content-type' => 'application/json',
         'KiwiApiKey' => $purl_api_key
   );
-  array_walk($header_values, static function(&$v, $k) { $v = $k.': '.$v; });
+
+  foreach ($header_values as $key => &$value) {
+    $value = $key . ': ' . $value;
+  }
+
   $header = implode("\r\n", $header_values);
   return $header;
 }
