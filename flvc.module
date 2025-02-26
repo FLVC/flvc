@@ -1833,7 +1833,7 @@ function valid_purl_server_name($url) {
 function get_purl_from_url($url) {
   $purl_valid_server_names = explode(",", variable_get('flvc_purl_valid_server_names', 'purl.flvc.org,purl.fcla.edu'));
 
-  $purl = $url;
+  $purl = trim($url);
   $purl = str_replace('http://','',$purl);
   $purl = str_replace('https://','',$purl);
 
